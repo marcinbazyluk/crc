@@ -1,2 +1,2 @@
-# crc
-Corporate Readiness Certificate
+# CRC
+Education materials for Corporate Readiness Certificate program.
