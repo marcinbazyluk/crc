@@ -1,0 +1,129 @@
+---
+- hosts: s-wr
+  remote_user: root
+  gather_facts: yes
+  tasks:
+
+    - name: set timezone to Europe/Warsaw
+      timezone:
+        name: Europe/Warsaw
+
+    - name: Install Epel repo
+      yum: name=epel-release state=present
+
+    - name: Install prerequisite packages for docker server
+      yum:
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+          - git
+          - jq
+          - lsof
+          - python-pip
+
+
+    - name: Install and enable docker repo
+      shell: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+    - name: Install Docker server
+      yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+
+    - name: Assign studentvm to docker and wheel
+      user:
+       name: studentvm
+       groups:
+         - docker
+         - wheel
+       append: yes
+
+
+    - name: Upgrade pip
+      pip:
+        name: pip
+        extra_args: --upgrade
+
+    - name: Install docker-py
+      pip: name=docker-py
+
+    - name: logging to DockerHub
+      shell: docker login --username=crcdevops --password=Z@katek11#
+      become: yes
+      become_user: studentvm
+
+    - name: Enable service docker and ensure it is not masked
+      systemd:
+        name: docker
+        enabled: yes
+        masked: no
+
+    - name: Make sure that docker service is running
+      systemd:
+        state: started
+        name: docker
+
+    - name: Download docker-compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/1.23.2/docker-compose-Linux-x86_64"
+        dest: "/usr/bin/docker-compose"
+        follow: True
+        force: yes
+
+    - name: Set permissions and making symlinc
+      file:
+        path: /usr/bin/docker-compose
+        owner: root
+        group: docker
+        mode: 0755
+
+    - name: Create directory .ssh
+      file:
+        path: /home/studentvm/.ssh
+        owner: studentvm
+        group: studentvm
+        mode: 0700
+        state: directory
+
+    - name: Copy authorized_keys
+      copy:
+        src: secure/authorized_keys
+        dest: /home/studentvm/.ssh/authorized_keys
+        owner: studentvm
+        group: studentvm
+        mode: 0600
+
+    - name: Set permissions for /etc/hosts
+      file:
+        path: /etc/hosts
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Copy hosts file to /etc/hosts docker server
+      copy:
+        src: "../src/etc/hosts"
+        dest: /etc/hosts
+        mode: 0644
+
+    - name: Replace string do not use cloud manage /etc/hosts file
+      replace:
+        path: /etc/cloud/cloud.cfg
+        regexp: 'manage_etc_hosts: True'
+        replace: "manage_etc_hosts: False"
+
+    - name: Adding temp write permission for sudoers
+      file:
+        path: /etc/sudoers
+        owner: root
+        group: root
+        mode: "u+w"
+
+    - name: SUDO without passwords
+      copy:
+        src: "../src/etc/sudoers"
+        dest: /etc/sudoers
+        mode: 0440

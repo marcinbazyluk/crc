@@ -1,0 +1,439 @@
+# CRC-DEVOPS Part for 1st and 2nd part
+
+version: '3.4'
+services:
+
+  vm-grafana:
+    image: crcdevops/grafana:latest
+    volumes:
+      - ${PWD}/grafana/scripts:/var/lib/grafana/custom
+      - ${PWD}/grafana/provisioning:/etc/grafana/provisioning
+      - ${PWD}/grafana/initialize/entrypoint/:/initialize/entrypoint/
+      - crc-grafana:/var/lib/grafana
+
+    hostname: vm-grafana
+    container_name: vm-grafana
+    restart: always
+    networks:
+       CRC_Net:
+         ipv4_address: 10.200.200.100
+    ports:
+      - "0.0.0.0:3000:3000/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+      - source: grafana.ini
+        target: /etc/grafana.ini
+
+  # Prometheus data source container
+  vm-prometheus:
+    image: crcdevops/prometheus:latest
+    volumes:
+      - crc-prometheus:/prometheus
+    hostname: vm-prometheus
+    container_name: vm-prometheus
+    restart: always
+    networks:
+       CRC_Net:
+         ipv4_address: 10.200.200.101
+    ports:
+      - "0.0.0.0:9999:9090/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+      - source: prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+      - source: mq-targets.yml
+        target: /etc/prometheus/mq-targets.yml
+
+  # Graphite data source container
+  vm-graphite:
+    image: crcdevops/graphite:latest
+    volumes:
+      - crc-graphite:/opt/graphite/storage
+    hostname: vm-graphite
+    container_name: vm-graphite
+    restart: always
+    networks:
+       CRC_Net:
+         ipv4_address: 10.200.200.102
+    ports:
+      - "0.0.0.0:80:80/tcp"
+      - "0.0.0.0:2003-2004:2003-2004"
+      - "0.0.0.0:2023-2024:2023-2024"
+      - "0.0.0.0:8125:8125/udp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+  # InfluxDB data source container
+  vm-influxdb:
+    image: crcdevops/influxdb:latest
+    volumes:
+      - crc-influxdb:/var/lib/influxdb
+    hostname: vm-influxdb
+    container_name: vm-influxdb
+    restart: always
+    networks:
+       CRC_Net:
+         ipv4_address: 10.200.200.103
+    ports:
+      - "0.0.0.0:8086:8086/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+
+  # InfluxDB data source container
+  #vm-njmon:
+  #  image: crcdevops/njmon:latest
+  #  volumes:
+  #    - crc-njmon:/njmon
+  #  hostname: vm-njmon
+  #  container_name: vm-njmon
+  #  restart: always
+  #  networks:
+  #     CRC_Net:
+  #       ipv4_address: 10.200.200.104
+  #  ports:
+  #    - "0.0.0.0:8181:8181/tcp"
+  #  secrets:
+  #    - source: hosts
+  #      target: /etc/hosts
+
+  # Cadvisor (docker monitoring)
+  vm-cadvisor:
+    image: crcdevops/cadvisor:latest
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    hostname: vm-cadvisor
+    container_name: vm-cadvisor
+    networks:
+       CRC_Net:
+         ipv4_address: 10.200.200.105
+    ports:
+      - 0.0.0.0:8080:8080
+    restart: always
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+  # Node exporter (docker monitoring)
+  exp-node:
+    image: crcdevops/node-exporter:latest
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    hostname: exp-node
+    container_name: exp-node
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - --collector.filesystem.ignored-mount-points
+      - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.157
+    ports:
+      - 0.0.0.0:9797:9100
+    restart: always
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+
+  # Prometheus alert manager (docker monitoring)
+  vm-alert:
+    image: crcdevops/alert-manager:latest
+    volumes:
+      - ./alert/conf/config.yml:/etc/alertmanager/config.yml
+      - crc-alert:/alertmanager
+      - ./alert/conf/notifications.tmpl:/alertmanager/notifications.tmpl
+    hostname: vm-alert
+    container_name: vm-alert
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.106
+    ports:
+      - 0.0.0.0:9993:9093
+    restart: always
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+
+  # Tomcat sample container
+  vm-tomcat:
+    image: crcdevops/tomcat:latest
+    hostname: vm-tomcat
+    container_name: vm-tomcat
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.31
+    ports:
+      - "0.0.0.0:8888:8080/tcp"
+      - "0.0.0.0:9000:9000/tcp"
+      - "0.0.0.0:8009:8009/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+  # Tomcat prometheus exporter
+  exp-tomcat:
+    image: crcdevops/tomcat-exp:latest
+    hostname: exp-tomcat
+    container_name: exp-tomcat
+    environment:
+      - DEST_PORT=9000
+      - DEST_HOST=vm-tomcat
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.154
+    ports:
+      - "0.0.0.0:9072:9072/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+  # Nginx sample container
+  #vm-nginx:
+  #  image: crcdevops/nginx:latest
+  #  hostname: vm-nginx
+  #  container_name: vm-nginx
+  #  restart: always
+  #  networks:
+  #    CRC_Net:
+  #      ipv4_address: 10.200.200.40
+  #  ports:
+  #    - "0.0.0.0:81:80/tcp"
+  #  secrets:
+  #    - source: hosts
+  #      target: /etc/hosts
+  #    - source: httpd.conf
+  #      target: /usr/local/apache2/conf/httpd.conf
+  #    - source: status.conf
+  #      target: /usr/local/apache2/conf/extra/status.conf
+
+  # Nginx prometheus exporter
+  #exp-nginx:
+  #  image: crcdevops/nginx-exp:latest
+  #  hostname: exp-nginx
+  #  container_name: exp-nginx
+  #  environment:
+  #    - nginx.scrape-uri http://vm-nginx:80/status'
+  #  restart: always
+  #  networks:
+  #    CRC_Net:
+  #      ipv4_address: 10.200.200.153
+  #  ports:
+  #    - "0.0.0.0:9113:9113/tcp"
+  #  secrets:
+  #    - source: hosts
+  #      target: /etc/hosts
+
+  # Apache sample container
+  vm-apache:
+    image: crcdevops/apache:latest
+    hostname: vm-apache
+    container_name: vm-apache
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.41
+    ports:
+      - "0.0.0.0:82:80/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+      - source: httpd.conf
+        target: /usr/local/apache2/conf/httpd.conf
+      - source: status.conf
+        target: /usr/local/apache2/conf/extra/status.conf
+
+  # Apache prometheus exporter
+  exp-apache:
+    image: crcdevops/apache-exp:latest
+    hostname: exp-apache
+    container_name: exp-apache
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.152
+    ports:
+      - "0.0.0.0:9117:9117/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+ # 1st RedHat sample container
+  vm1-os:
+    image: crcdevops/redhat:latest
+    hostname: vm1-os
+    container_name: vm1-os
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.10
+    ports:
+      - "0.0.0.0:10001:9100/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+  # 2nd RedHat sample container
+  vm2-os:
+    image: crcdevops/redhat:latest
+    hostname: vm2-os
+    container_name: vm2-os
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.11
+    ports:
+      - "0.0.0.0:10002:9100/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+
+  # 1st RedHat sample container
+  vm3-os:
+     image: crcdevops/telegraf:latest
+     hostname: vm3-os
+     container_name: vm3-os
+     networks:
+       CRC_Net:
+         ipv4_address: 10.200.200.12
+     secrets:
+       - source: hosts
+         target: /etc/hosts
+
+  # 2nd RedHat sample container
+  vm4-os:
+     image: crcdevops/telegraf:latest
+     hostname: vm4-os
+     container_name: vm4-os
+     restart: always
+     networks:
+       CRC_Net:
+         ipv4_address: 10.200.200.13
+     secrets:
+       - source: hosts
+         target: /etc/hosts
+
+  # MongoDB sample container
+  vm-mongodb:
+    image: crcdevops/mongodb:latest
+    hostname: vm-mongodb
+    container_name: vm-mongodb
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.20
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+  # MongoDB prometheus exporter
+  exp-mongodb:
+    image: crcdevops/mongodb-exp:latest
+    hostname: exp-mongodb
+    container_name: exp-mongodb
+    command:
+      - 'mongodb://vm-mongodb:27017'
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.150
+    ports:
+      - "0.0.0.0:9001:9001/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+  # MariaDB sample container
+  vm-mariadb:
+    image: crcdevops/mariadb:latest
+    hostname: vm-mariadb
+    container_name: vm-mariadb
+    environment:
+      - MYSQL_ROOT_PASSWORD=crc2019
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.21
+    ports:
+      - "0.0.0.0:3360:3360/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+  # MariaDB prometheus exporter
+  exp-mariadb:
+    image: crcdevops/mariadb-exp:latest
+    hostname: exp-mariadb
+    container_name: exp-mariadb
+    restart: always
+    environment:
+      - DATA_SOURCE_NAME="exporter:crc2019@(vm-mariadb:3306)/"
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.151
+    ports:
+      - "0.0.0.0:9104:9104/tcp"
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+
+  # Asystent data feeding container
+  vm-asystent:
+    image: crcdevops/asystent:latest
+    hostname: vm-asystent
+    container_name: vm-asystent
+    restart: always
+    networks:
+      CRC_Net:
+        ipv4_address: 10.200.200.70
+    secrets:
+      - source: hosts
+        target: /etc/hosts
+
+
+secrets:
+  hosts:
+    file: ./src/etc/hosts
+  grafana.ini:
+    file: ./grafana/conf/grafana.ini
+  prometheus.yml:
+    file: ./prometheus/conf/prometheus.yml
+  mq-targets.yml:
+    file: ./prometheus/conf/mq-targets.yml
+  httpd.conf:
+    file: ./apache/conf/httpd.conf
+  status.conf:
+    file: ./apache/conf/status.conf
+
+volumes:
+  crc-grafana:
+  crc-prometheus:
+  crc-influxdb:
+  crc-graphite:
+  crc-njmon:
+  crc-alert:
+
+networks:
+  CRC_Net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.200.200.0/24

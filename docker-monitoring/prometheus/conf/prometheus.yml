@@ -1,0 +1,73 @@
+global:
+  scrape_interval:     15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+
+  #external_labels:
+  #    monitor: 'docker-monitoring-system'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+  - scheme: http
+    static_configs:
+    - targets:
+      - 'vm-alert:9093'
+
+# Konfiguracja reguł na potrzeby laboratorium
+rule_files:
+  - "crc-rules-docker.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+
+  # metrics_path defaults to '/metrics'
+  # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # node exporter for os containers
+  - job_name: 'machines'
+    scrape_interval: 5s
+    static_configs:
+     - targets: ['vm1-os:9100', 'vm2-os:9100']
+
+  # node exporter for vm-mariadbdb (separate docker container)
+  - job_name: 'mariadb'
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['exp-mariadb:9104']
+
+  # node exporter for vm-nginx (separate docker container)
+  #- job_name: 'nginx'
+  #  scrape_interval: 5s
+  #  static_configs:
+  #  - targets: ['exp-nginx:9113']
+
+  # node exporter for vm-nginx (separate docker container)
+  - job_name: 'jmx'
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['exp-tomcat:9072']
+
+  # cadvisor (docker monitoring)
+  - job_name: 'cadvisor'
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['vm-cadvisor:8080']
+
+  # nodexporter (docker monitoring)
+  - job_name: 'node-exporter'
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['exp-node:9100']
+
+  # node exporters for messaging systems (separate docker containers)
+  #- job_name: 'mq'  # This will be overridden in targets.yml
+  #  file_sd_configs:
+  #    - files:
+  #      - mq-targets.yml

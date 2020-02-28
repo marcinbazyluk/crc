@@ -1,0 +1,16 @@
+---
+- hosts: s-wr
+  remote_user: studentvm
+  gather_facts: no
+
+  tasks:
+
+    - name: Execute excercise 1,2,3,4,8,9
+      shell: |
+        /home/studentvm/lab/cwiczenia/1/wykonaj.sh
+        /home/studentvm/lab/cwiczenia/2/wykonaj.sh admin crc2019
+        /home/studentvm/lab/cwiczenia/3/wykonaj.sh
+        /home/studentvm/lab/cwiczenia/4/wykonaj.sh
+        /home/studentvm/lab/cwiczenia/8/wykonaj.sh
+        /home/studentvm/lab/cwiczenia/9/wykonaj.sh
+      ignore_errors: yes

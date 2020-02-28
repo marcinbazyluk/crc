@@ -1,0 +1,18 @@
+---
+- hosts: s-kt
+  remote_user: root
+  gather_facts: no
+  tasks:
+    - name: Copy initialization script
+      copy:
+        src: scripts/initialize.sh
+        dest: /usr/local/bin/initialize.sh
+        owner: studentvm
+        group: studentvm
+        mode: 0770
+
+    - name: Kubernetes initialization by script
+      become_user: studentvm
+      become_method: su
+      command: sh /usr/local/bin/initialize.sh
+      ignore_errors: yes

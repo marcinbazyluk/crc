@@ -1,0 +1,64 @@
+# CRC Edukacja - cwiczenie 12
+
+groups:
+- name: alerts
+  rules:
+
+  # Alert for any instance that is unreachable for >2 minutes.
+  - alert: service_down
+    expr: up == 0
+    for: 2m
+    labels:
+      severity: page
+    annotations:
+      summary: "Instance {{ $labels.instance }} down"
+      description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 2 minutes."
+
+  - alert: high_load
+    expr: node_load1 > 6.0
+    for: 2m
+    labels:
+      severity: page
+    annotations:
+      summary: "Instance {{ $labels.instance }} under high load"
+      description: "{{ $labels.instance }} of job {{ $labels.job }} is under high load."
+
+  # High memory usage
+  - alert: high_memory_usage
+    expr: (sum(node_memory_MemTotal) - sum(node_memory_MemFree + node_memory_Buffers + node_memory_Cached) ) / sum(node_memory_MemTotal) * 100 > 50
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory utilisation for {{ $labels.instance }}"
+      description: "{{ $labels.instance }} of job {{ $labels.job }} has high memory utilisation , the utilisation is currently: {{ $value }}%"
+
+  # Critical memory usage
+  - alert: critical_memory_usage
+    expr: (sum(node_memory_MemTotal) - sum(node_memory_MemFree + node_memory_Buffers + node_memory_Cached) ) / sum(node_memory_MemTotal) * 100 > 70
+    for: 2m
+    labels:
+      severity: page
+    annotations:
+      summary: "!!! Critical memory utilisation for {{ $labels.instance }}"
+      description: "!!! {{ $labels.instance }} of job {{ $labels.job }} has critical memory utilisation , the utilisation is currently: {{ $value }}%"
+
+  # High CPU usage
+  - alert: high_cpu_usage
+    expr: 100 - (avg by(instance) (irate(node_cpu{mode="idle"}[5m])) * 100) > 70
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      description: 'High CPU utilisation detected for instance {{ $labels.instance_id }} tagged as: {{ $labels.instance_name_tag }}, the utilisation is currently: {{ $value }}%'
+      summary: "High CPU Utilisation Alert"
+
+  # Critical CPU usage
+  - alert: critical_cpu_usage
+    expr: 100 - (avg by(instance) (irate(node_cpu{mode="idle"}[5m])) * 100) > 90
+    for: 3m
+    labels:
+      severity: page
+    annotations:
+      description: '!!! Critical CPU utilisation detected for instance {{ $labels.instance_id }} tagged as: {{ $labels.instance_name_tag }}, the utilisation is currently: {{ $value }}%'
+      summary: "!!! Critical CPU Utilisation Alert"

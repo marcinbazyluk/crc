@@ -1,0 +1,10 @@
+#datasources:
+#  - name: 'NMON'
+#    type: 'influxdb'
+#    access: 'proxy'
+#    url: 'http://vm-influxdb:8086'
+#    password: 'crc2019'
+#    user: 'nmon'
+#    database: 'nmon'
+#    isDefault: false
+#    editable: true

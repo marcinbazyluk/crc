@@ -1,0 +1,42 @@
+# Variables
+
+lab = {
+  "vm-grafana"       => { :osimage => "centos/7",        :ip => "192.168.150.2",  :cpus => 1,  :mem => 512 , :customize => "grafana.sh",         :exp_port => "3000" },
+  "vm-influxdb"      => { :osimage => "centos/7",        :ip => "192.168.150.3",  :cpus => 1,  :mem => 512,  :customize => "influxdb.sh",        :exp_port => "8086" },
+  "vm-njmon"         => { :osimage => "ubuntu/bionic64", :ip => "192.168.150.4",  :cpus => 1,  :mem => 256,  :customize => "njmon-collector.sh", :exp_port => "8181" },
+  "vm-nmon"          => { :osimage => "centos/7",        :ip => "192.168.150.5",  :cpus => 1,  :mem => 256,  :customize => "nmon-collector.sh",  :exp_port => "8282" },
+  "vm-prometheus"    => { :osimage => "centos/7",        :ip => "192.168.150.6",  :cpus => 1,  :mem => 256,  :customize => "prometheus.sh",      :exp_port => "9090" },
+  "vm1-os"           => { :osimage => "centos/7",        :ip => "192.168.150.10", :cpus => 1,  :mem => 128,  :customize => "njmon-client.sh",    :exp_port => "9991" },
+  "vm2-os"           => { :osimage => "centos/7",        :ip => "192.168.150.11", :cpus => 1,  :mem => 128,  :customize => "njmon-client.sh",    :exp_port => "9992" },
+  "vm3-os"           => { :osimage => "centos/7",        :ip => "192.168.150.12", :cpus => 1,  :mem => 128,  :customize => "nmon-client.sh",     :exp_port => "9993" },
+  "vm4-os"           => { :osimage => "centos/7",        :ip => "192.168.150.13", :cpus => 1,  :mem => 128,  :customize => "nmon-client.sh",     :exp_port => "9994" },
+  "vm5-os"           => { :osimage => "centos/7",        :ip => "192.168.150.14", :cpus => 1,  :mem => 128,  :customize => "node-exporter.sh",   :exp_port => "9995" },
+  "vm6-os"           => { :osimage => "centos/7",        :ip => "192.168.150.15", :cpus => 1,  :mem => 128,  :customize => "node-exporter.sh",   :exp_port => "9996" },
+}
+
+Vagrant.configure("2") do |config|
+  lab.each_with_index do |(hostname, info), index|
+    config.vm.define hostname do |cfg|
+
+      cfg.ssh.insert_key = false
+      cfg.ssh.keys_only = false
+      cfg.ssh.private_key_path = ['~/.vagrant.d/insecure_private_key', './src/keys/id_rsa']
+      cfg.vm.provision "file", source: "./src/keys/id_rsa.pub", destination: "~/.ssh/authorized_keys"
+      cfg.vm.provision "file", source: "./src/keys/id_rsa", destination: "~/.ssh/id_rsa"
+      cfg.vm.provision "shell", inline: "sed -i 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config; systemctl restart sshd", privileged: true
+      cfg.vm.provision "shell", inline: "timedatectl set-timezone Europe/Warsaw", privileged: true
+      cfg.vm.provision "shell", path: "src/scripts/provisioning/hosts.sh"
+      cfg.vm.provision "shell", path: "src/scripts/provisioning/root-ssh-access.sh"
+      cfg.vm.provision "shell", path: "src/scripts/provisioning/#{info[:customize]}"
+
+      cfg.vm.provider :virtualbox do |vb, override|
+        config.vm.box = info[:osimage]
+        override.vm.network :private_network, ip: "#{info[:ip]}"
+        override.vm.network "forwarded_port", guest: "#{info[:exp_port]}", host: "#{info[:exp_port]}", protocol: "tcp"
+        override.vm.hostname = hostname
+        vb.name = hostname
+        vb.customize ["modifyvm", :id, "--memory", info[:mem], "--cpus", info[:cpus], "--hwvirtex", "on"]
+      end # end provider
+    end # end config
+  end # end lab
+end

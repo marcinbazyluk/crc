@@ -1,0 +1,4 @@
+FROM prom/mysqld-exporter
+LABEL author="CRC Team"
+LABEL description="MariaDB node exporter"
+EXPOSE 9104

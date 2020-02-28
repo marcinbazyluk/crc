@@ -1,0 +1,3 @@
+CREATE DATABASE monitor
+CREATE USER monitor WITH PASSWORD 'crc2019'
+GRANT ALL ON monitor TO monitor

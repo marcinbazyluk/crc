@@ -1,0 +1,52 @@
+#!/bin/bash
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# !!!IBM MISC SCRIPT FOR NMON GRAFANA IMPORT FILES AND PUBLISH DASHBOARDS !!!
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#
+# Script has been written to import nmon files from particular servers. Be aware! do not run this script manually!
+# Script execute 2 parts. 1st is about downloading current day nmon files to /share/nmons directory. 2nd part is
+# doing data processing for grafana. For more details please contact with script Author: Janusz Kujawa.
+#
+#
+# When:			    Who:			      Functinality:						                                                         		Version:
+# 08/04/2019		Janusz Kujawa		Adjust script for pumping data in lab environment (DC Academy and CRC)	           	1.0
+
+### SCRIPT VARIABLES
+HOSTLIST_LAB="/usr/local/nmon-import/lab.lst"
+SOURCE_DIR="/share"
+DESTINATION_DIR_LAB="/share"
+NMON_FILES_PATERN="*nmon*"
+DOWNLOAD="/usr/bin/rsync"
+CURRENT_DATE=`date +%y%m%d`
+TRANSFER_LIST_LAB="/usr/local/nmon-import/db/lab-linux_current_day.csv"
+
+SCRIPT_OUT="/usr/local/nmon-import/logs/lab_run_current.out"
+RUNDATE=`date +%F_%H:%M:%S`
+
+### ZERO FILE TRANSFER CSV FILE
+> $TRANSFER_LIST_LAB
+
+# IMPORT LINUX DATA REMOTELY
+function f_import_influxdb_lab {
+echo "****************************"
+echo "*** DB IMPORT LINUX DATA ***"
+echo "****************************"
+echo ""
+date
+echo ""
+/usr/bin/nmon2influxdb import ${DESTINATION_DIR_LAB}
+done
+}
+
+# SEND SLACK NOTIFICATION
+function f_send_slack {
+        python /usr/local/nmon-import/bin/nmon_import_slack.py
+}
+
+
+# EXECUTION PART
+
+f_import_influxdb_lab >> $SCRIPT_OUT
+
+# SENDING MAIL
+#f_send_slack;

@@ -1,0 +1,100 @@
+#!/bin/bash
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# !!!IBM MISC SCRIPT FOR NMON GRAFANA IMPORT FILES AND PUBLISH DASHBOARDS !!!
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#
+# Script has been written to import nmon files from particular servers. Be aware! do not run this script manually!
+# Script execute 2 parts. 1st is about downloading current day nmon files to /share/nmons directory. 2nd part is
+# doing data processing for grafana. For more details please contact with script Author: Janusz Kujawa.
+#
+#
+# When:			    Who:			      Functinality:						                                                         		Version:
+# 08/04/2019		Janusz Kujawa		Adjust script for pumping data in lab environment (DC Academy and CRC)	           	1.0
+
+### SCRIPT VARIABLES
+HOSTLIST_LAB="/usr/local/nmon-import/lab.lst"
+SOURCE_DIR="/etc/perf/daily"
+DESTINATION_DIR_LAB="/nmons"
+NMON_FILES_PATERN="*nmon*"
+DOWNLOAD="/usr/bin/rsync"
+CURRENT_DATE=`date +%y%m%d`
+TRANSFER_LIST_LAB="/usr/local/nmon-import/db/lab-linux_current_day.csv"
+
+SCRIPT_OUT="/usr/local/nmon-import/logs/lab_run_current.out"
+RUNDATE=`date +%F_%H:%M:%S`
+
+### ZERO FILE TRANSFER CSV FILE
+> $TRANSFER_LIST_LAB
+
+
+### DECLARE FUNCTION
+
+
+# CREATE TRANSFER LIST
+function f_transfer_list_lab {
+        for server in `cat $HOSTLIST_LAB |grep -v "^#"`; do
+                (echo -n $server";";ssh root@$server "sudo find $SOURCE_DIR -type f -name $server'_'$CURRENT_DATE'*nmon'") >> $TRANSFER_LIST_LAB;
+        done
+}
+
+# DOWNLOAD NMONS LAB
+function f_download_lab {
+	echo "*******************************"
+	echo "*** DOWNLOAD NMON FILES LAB ***"
+	echo "*******************************"
+	while IFS=';' read -r d1 d2
+	do
+		mkdir -p $DESTINATION_DIR_LAB/$d1
+		echo $d1
+		filename=`cat $TRANSFER_LIST_LAB | grep $d1 | awk -F\/ '{ print $5 }'`
+		echo $filename
+		echo "Starting download procedure: "$RUNDATE
+		echo "Downloading file:"
+		$DOWNLOAD -avz root@$d1:$d2 $DESTINATION_DIR_LAB"/"$d1 > /dev/null 2>&1
+		echo "++++++++++++++++++++++++++++++++++++"
+		echo "Filename downloaded: "$filename
+		echo "Check file modification: "
+		stat --format "%y" $DESTINATION_DIR_LAB"/"$d1"/"$filename
+		echo "===================================="
+	done < "$TRANSFER_LIST_LAB"
+}
+
+function f_permissions_fix {
+		sudo chmod -R 777 $DESTINATION_DIR_LAB
+
+}
+
+# IMPORT LINUX DATA REMOTELY
+function f_import_influxdb_lab {
+echo "****************************"
+echo "*** DB IMPORT LINUX DATA ***"
+echo "****************************"
+for line in `cat $TRANSFER_LIST_LAB`; do
+        i1=`echo $line | awk -F\; '{ print $1 }'`
+        i2=`echo $line | awk -F\; '{ print $2 }' | awk -F\/ '{ print $5 }'`
+        echo "Following file will be imported to InfluxDB: "$i2
+        echo "processing..."
+  /usr/local/bin/nmon2influxdb import ${DESTINATION_DIR_LAB}/${i1}/${i2}
+	echo "-------------------------------------------------------------------------"
+done
+}
+
+# SEND SLACK NOTIFICATION
+function f_send_slack {
+        python /usr/local/nmon-import/bin/nmon_import_slack.py
+}
+
+
+# EXECUTION PART
+
+f_transfer_list_lab >> $SCRIPT_OUT
+
+# DOWNLOAD
+f_download_lab >> $SCRIPT_OUT
+f_permissions_fix >> $SCRIPT_OUT
+
+# IMPORT
+f_import_influxdb_lab >> $SCRIPT_OUT
+
+# SENDING MAIL
+#f_send_slack;

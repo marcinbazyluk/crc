@@ -1,0 +1,120 @@
+---
+- hosts: s-wr
+  remote_user: studentvm
+  gather_facts: no
+  vars:
+    grafana_user: admin
+    grafana_pass: admin
+    github_user: jankujawa
+    github_token: 8f959a15d4e19e57a2b4356d489390f140e79b7c
+    github_uri: /CRC/docker-monitoring.git
+    github_server: github.ibm.com
+    github_dest_clone: /home/studentvm/lab
+    grafana_container: vm-grafana
+    grafana_shell_user: grafana
+
+  tasks:
+
+    - git:
+        repo: https://{{ github_user }}:{{ github_token }}@{{ github_server }}{{ github_uri }}
+        dest: "{{ github_dest_clone }}"
+        clone: yes
+        force: yes
+
+    - name: GRAFANA --- create organisation Grupa1
+      uri:
+        url: "http://{{ grafana_user }}:{{ grafana_pass }}@vm-grafana:3000/api/orgs"
+        method: POST
+        return_content: yes
+        force_basic_auth: yes
+        body: { "name":"Grupa1", "orgId":2 }
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+      ignore_errors: yes
+
+    - name: GRAFANA --- create user Jan Kowalski
+      uri:
+        url: http://{{ grafana_user }}:{{ grafana_pass }}@vm-grafana:3000/api/admin/users
+        method: POST
+        return_content: yes
+        force_basic_auth: yes
+        body: {"name":"Tester - Jan Kowalski","email":"jan.kowalski@localhost","login":"jkowalski","password":"crc2019"}
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+      ignore_errors: yes
+
+    - name: GRAFANA --- create user Tomasz Szybki
+      uri:
+        url: http://{{ grafana_user }}:{{ grafana_pass }}@vm-grafana:3000/api/admin/users
+        method: POST
+        return_content: yes
+        force_basic_auth: yes
+        body: { "name":"Developer - Tomasz Szybki","email":"tomasz.szybki@localhost","login":"tszybki","password":"crc2019" }
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+      ignore_errors: yes
+
+    - name: GRAFANA --- add Jan Kowalski to Grupa1
+      uri:
+        url: http://{{ grafana_user }}:{{ grafana_pass }}@vm-grafana:3000/api/orgs/2/users
+        method: POST
+        return_content: yes
+        force_basic_auth: yes
+        body: { "loginOrEmail":"jkowalski","role":"Viewer" }
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+      ignore_errors: yes
+
+    - name: GRAFANA --- add Tomasz Szybki to Grupa1
+      uri:
+        url: http://{{ grafana_user }}:{{ grafana_pass }}@vm-grafana:3000/api/orgs/2/users
+        method: POST
+        return_content: yes
+        force_basic_auth: yes
+        body: { "loginOrEmail":"tszybki","role":"Editor" }
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+      ignore_errors: yes
+
+    - name: GRAFANA --- remove Jan Kowalski from Main Org.
+      uri:
+        url: http://{{ grafana_user }}:{{ grafana_pass }}@vm-grafana:3000/api/orgs/1/users/2
+        method: DELETE
+        return_content: yes
+        force_basic_auth: yes
+        headers:
+          Content-Type: "application/json"
+      ignore_errors: yes
+
+    - name: GRAFANA --- remove Tomasz Szybki from Main Org.
+      uri:
+        url: http://{{ grafana_user }}:{{ grafana_pass }}@vm-grafana:3000/api/orgs/1/users/3
+        method: DELETE
+        return_content: yes
+        force_basic_auth: yes
+        headers:
+          Content-Type: "application/json"
+      ignore_errors: yes
+
+    - name: Install grafana plugins (piechart and worldmap) and restart vm-grafana
+      shell: |
+        docker exec -it --user {{ grafana_shell_user }} {{ grafana_container }} bash -c "grafana-cli plugins install grafana-piechart-panel"
+        docker exec -it --user {{ grafana_shell_user }} {{ grafana_container }} bash -c "grafana-cli plugins install grafana-worldmap-panel"
+        docker restart vm-grafana
+      ignore_errors: yes
+
+    #- name: Execute excercise 1-3 
+    #  shell: |
+    #    /home/studentvm/lab/cwiczenia/1/wykonaj.sh 
+    #    /home/studentvm/lab/cwiczenia/2/wykonaj.sh admin crc2019
+    #    /home/studentvm/lab/cwiczenia/3/wykonaj.sh 
+    #    /home/studentvm/lab/cwiczenia/4/wykonaj.sh
+    #    /home/studentvm/lab/cwiczenia/8/wykonaj.sh
+    #    /home/studentvm/lab/cwiczenia/9/wykonaj.sh
+    #  ignore_errors: yes
+

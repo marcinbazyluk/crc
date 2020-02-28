@@ -1,0 +1,11 @@
+[Unit]
+Description=Enable NJMON collector service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/start-njmon.sh
+ExecStop=/usr/local/bin/stop-njmon.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

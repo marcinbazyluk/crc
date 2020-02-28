@@ -1,0 +1,4 @@
+FROM nginx/nginx-prometheus-exporter:0.2.0
+LABEL author="CRC Team"
+LABEL description="Nginx node exporter"
+EXPOSE 9113

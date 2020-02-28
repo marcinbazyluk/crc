@@ -1,0 +1,7 @@
+FROM alpine:3.4
+LABEL author="CRC Team"
+LABEL description="MongoDB node exporter"
+EXPOSE 9001
+COPY prerequisite/mongodb/mongodb_exporter /usr/local/bin
+RUN chmod ug+x /usr/local/bin/mongodb_exporter
+ENTRYPOINT [ "mongodb_exporter", "-mongodb.uri" ]

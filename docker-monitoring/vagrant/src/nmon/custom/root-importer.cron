@@ -1,0 +1,2 @@
+# NMON import files into InfluxDB:
+*/5   *   *   *   *   /bin/bash -l -c 'source ~/.bash_profile;source ~/.bashrc;/usr/local/nmon-import/bin/nmon_importer' > /dev/null 2>&1

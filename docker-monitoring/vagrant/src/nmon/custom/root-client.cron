@@ -1,0 +1,4 @@
+# nmon data collection and housekeeping
+0 0 * * * /usr/local/bin/nmon -f -s 30 -c 2880 -T -N -I 0.1 -m /etc/perf/daily/ >/dev/null 2>&1
+5 0 * * * /usr/bin/find /etc/perf/daily -name "*.nmon" -mtime +1 -exec gzip -9 {} \;
+59 23 * * * /usr/bin/find /etc/perf/daily -name "*.nmon*" -mtime +30 -exec rm {} \;

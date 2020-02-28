@@ -1,0 +1,175 @@
+---
+- hosts: s-wr
+  remote_user: root
+  vars:
+    repo_path: /home/studentvm/lab
+  tasks:
+
+### Remove containers
+
+  - name: Remove vm-grafana
+    docker_container:
+      name: vm-grafana
+      state: absent
+
+  - name: Remove vm-prometheus
+    docker_container:
+      name: vm-prometheus
+      state: absent
+
+  - name: Remove vm-graphite
+    docker_container:
+      name: vm-graphite
+      state: absent
+
+  - name: Remove vm-influxdb
+    docker_container:
+      name: vm-influxdb
+      state: absent
+
+  - name: Remove vm-nmon
+    docker_container:
+      name: vm-nmon
+      state: absent
+
+  - name: Remove vm-cadvisor
+    docker_container:
+      name: vm-cadvisor
+      state: absent
+
+  - name: Remove exp-node
+    docker_container:
+      name: exp-node
+      state: absent
+
+  - name: Remove vm-alert
+    docker_container:
+      name: vm-alert
+      state: absent
+
+  - name: Remove vm-tomcat
+    docker_container:
+      name: vm-tomcat
+      state: absent
+
+  - name: Remove exp-tomcat
+    docker_container:
+      name: exp-tomcat
+      state: absent
+
+  - name: Remove vm-apache
+    docker_container:
+      name: vm-apache
+      state: absent
+
+  - name: Remove exp-apache
+    docker_container:
+      name: exp-apache
+      state: absent
+
+  - name: Remove vm1-os
+    docker_container:
+        name: vm1-os
+        state: absent
+
+  - name: Remove vm2-os
+    docker_container:
+        name: vm2-os
+        state: absent
+
+  - name: Remove vm3-os
+    docker_container:
+        name: vm3-os
+        state: absent
+
+  - name: Remove vm4-os
+    docker_container:
+        name: vm4-os
+        state: absent
+
+  - name: Remove vm-mongodb
+    docker_container:
+      name: vm-mongodb
+      state: absent
+
+  - name: Remove exp-mongodb
+    docker_container:
+      name: exp-mongodb
+      state: absent
+
+  - name: Remove vm-mariadb
+    docker_container:
+      name: vm-mariadb
+      state: absent
+
+  - name: Remove exp-mariadb
+    docker_container:
+      name: exp-mariadb
+      state: absent
+
+  - name: Remove vm-asystent
+    docker_container:
+      name: vm-asystent
+      state: absent
+
+  - name: Remove vm1-os-nmon
+    docker_container:
+      name: vm1-os-nmon
+      state: absent
+
+  - name: Remove vm2-os-nmon
+    docker_container:
+      name: vm2-os-nmon
+      state: absent
+
+  - name: Remove vm3-os-nmon
+    docker_container:
+      name: vm3-os-nmon
+      state: absent
+
+### Remove volumes
+
+  - name: Remove grafana volume
+    docker_volume:
+      name: crc-grafana
+      state: absent
+
+  - name: Remove prometheus volume
+    docker_volume:
+      name: crc-prometheus
+      state: absent
+
+
+  - name: Remove influxdb volume
+    docker_volume:
+      name: crc-influxdb
+      state: absent
+
+  - name: Remove graphite volume
+    docker_volume:
+      name: crc-graphite
+      state: absent
+
+  - name: Remove nmon volume
+    docker_volume:
+      name: crc-nmon
+      state: absent
+
+  - name: Remove alertmanager volume
+    docker_volume:
+      name: crc-alert
+      state: absent
+
+  - name: Remove rest of volumes
+    command: docker volume prune -f
+
+  - name: Remove CRC_Net
+    docker_network:
+      name: CRC_Net
+      state: absent
+      force: yes
+
+  - name: Cleanup github cloned report
+    file:
+      state: absent
+      path: "{{ repo_path }}"

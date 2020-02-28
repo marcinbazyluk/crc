@@ -1,0 +1,7 @@
+datasources:
+-  access: 'proxy'
+   name: 'PROMETHEUS'
+   type: 'prometheus'
+   url: 'http://vm-prometheus:9090'
+   editable: true
+   is_default: true

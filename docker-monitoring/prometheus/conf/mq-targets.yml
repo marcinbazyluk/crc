@@ -1,0 +1,9 @@
+- targets: ['vm-rabbitmq:15672']
+  labels:
+    job: mq
+    __metrics_path__: /api/metrics
+
+- targets: ['vm-redis:9122']
+  labels:
+    job: mq  # can belong to the same job
+    __metrics_path__: /metrics

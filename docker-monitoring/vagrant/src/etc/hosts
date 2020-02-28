@@ -1,0 +1,18 @@
+# Main DATASOURCE servers
+192.168.150.2   vm-grafana
+192.168.150.3   vm-influxdb
+192.168.150.4   vm-njmon
+192.168.150.5   vm-nmon
+192.168.150.6   vm-prometheus
+
+# njmon clients
+192.168.150.10  vm1-os
+192.168.150.11  vm2-os
+
+# nmon clients
+192.168.150.12  vm3-os
+192.168.150.13  vm4-os
+
+# prometheus node exporters
+192.168.150.14  vm5-os
+192.168.150.15  vm6-os

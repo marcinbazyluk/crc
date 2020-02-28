@@ -1,0 +1,16 @@
+route:
+   receiver: 'slack'
+
+receivers:
+- name: 'slack'
+#  slack_configs:
+#  - channel: '#alerty-crc-<numer przydzielony przez instruktora - tabela 1>'
+#    username: 'studentvm-<numer przydzielony przez instruktora - tabela 1>'
+#    icon_url: https://avatars3.githubusercontent.com/u/3380462
+#    send_resolved: true
+#    title: '{{ template "custom_title" . }}'
+#    text: '{{ template "custom_slack_message" . }}'
+#    api_url: 'https://hooks.slack.com/services/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'
+
+#templates:
+#  - /alertmanager/notifications.tmpl

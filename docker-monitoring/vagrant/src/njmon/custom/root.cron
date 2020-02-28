@@ -1,0 +1,1 @@
+* 0 * * * /usr/local/bin/njmon -s 300 -c 288 -i vm-njmon -p 8181 -X crc2019

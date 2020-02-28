@@ -1,0 +1,517 @@
+---
+- hosts: s-wr
+  remote_user: studentvm
+  gather_facts: no
+  vars:
+    repo_path: /home/studentvm/lab
+  tasks:
+
+    - git:
+        repo: https://jankujawa:8f959a15d4e19e57a2b4356d489390f140e79b7c@github.ibm.com/CRC/docker-monitoring.git
+        dest: /home/studentvm/lab
+        clone: yes
+
+    - name: Create a network with options
+      docker_network:
+        name: CRC_Net
+        ipam_options:
+          subnet: '10.200.200.0/24'
+          gateway: 10.200.200.1
+          iprange: '10.200.200.0/24'
+
+    - name: Create volume for grafana
+      docker_volume:
+        name: 'crc-grafana'
+
+    - name: Create volume for prometheus
+      docker_volume:
+        name: 'crc-prometheus'
+
+    - name: Create volume for influxdb
+      docker_volume:
+        name: 'crc-influxdb'
+
+    - name: Create volume for graphite
+      docker_volume:
+        name: 'crc-graphite'
+
+    - name: Create volume for Nmon
+      docker_volume:
+        name: 'crc-nmon'
+
+    - name: Create volume for alertmanager
+      docker_volume:
+        name: 'crc-alert'
+
+    - name: Start grafana container
+      docker_container:
+        name: vm-grafana
+        restart_policy: unless-stopped
+        memory: 256M
+        image: crcdevops/grafana:latest
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-grafana:/var/lib/grafana"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+          - "{{ repo_path }}/grafana/conf/grafana.ini:/etc/grafana/grafana.ini"
+          - "{{ repo_path }}/grafana/provisioning:/etc/grafana/provisioning"
+          - "{{ repo_path }}/grafana/initialize:/initialize"
+          - "{{ repo_path }}/grafana/dashboards:/var/lib/grafana/dashboards"
+        ports:
+          - "0.0.0.0:3000:3000/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.100"
+
+    #- name: Initialize grafana startup objects
+    #  shell: |
+    #    {{ repo_path }}/grafana/initialize/organisation.sh admin admin
+    #    {{ repo_path }}/grafana/initialize/users.sh admin admin
+
+    - name: Start prometheus container
+      docker_container:
+        name: vm-prometheus
+        restart_policy: unless-stopped
+        memory: 256M
+        image: crcdevops/prometheus:latest
+        hostname: vm-prometheus
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-prometheus:/prometheus"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+          - "{{ repo_path }}/prometheus/conf/prometheus.yml:/etc/prometheus/prometheus.yml"
+          - "{{ repo_path }}/prometheus/conf/mq-targets.yml:/etc/prometheus/mq-targets.yml"
+          - "{{ repo_path }}/prometheus/conf/crc-rules-docker.yml:/etc/prometheus/crc-rules-docker.yml"
+        ports:
+          - "0.0.0.0:9090:9090/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.101"
+
+
+    - name: Start graphite container
+      docker_container:
+        name: vm-graphite
+        restart_policy: unless-stopped
+        memory: 128M
+        image: crcdevops/graphite:latest
+        hostname: vm-graphite
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-graphite:/opt/graphite/storage"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+
+        ports:
+          - "0.0.0.0:80:80/tcp"
+          - "0.0.0.0:2003:2003"
+          - "0.0.0.0:2004:2004"
+          - "0.0.0.0:2023:2023"
+          - "0.0.0.0:2024:2024"
+          - "0.0.0.0:8125:8125/udp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.102"
+
+    - name: Start influxdb container
+      docker_container:
+        name: vm-influxdb
+        restart_policy: unless-stopped
+        memory: 256M
+        image: crcdevops/influxdb:latest
+        hostname: vm-influxdb
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-influxdb:/var/lib/influxdb"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:8086:8086/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.103"
+
+    - name: Start nmon importer container
+      docker_container:
+        name: vm-nmon
+        restart_policy: unless-stopped
+        memory: 256M
+        image: crcdevops/nmon-importer:latest
+        hostname: vm-nmon
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-nmon:/share"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+          - "{{ repo_path }}/nmon-importer/bin/nmon_importer:/usr/local/nmon-import/bin/nmon_importer"
+          - "{{ repo_path }}//nmon-importer/bin/nmon_import_slack.py:/usr/local/nmon-import/bin/nmon_import_slack.py"
+          - "{{ repo_path }}/nmon-importer/config/root-importer.cron:/var/spool/cron/root"
+          - "{{ repo_path }}/nmon-importer/config/.nmon2influxdb.cfg:/root/.nmon2influxdb.cfg"
+          - "{{ repo_path }}/nmon-importer/config/lab.lst:/usr/local/nmon-import/lab.lst"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.104"
+        command:
+          - '/usr/sbin/crond -n -x ext'
+
+    - name: Start cadvisor container
+      docker_container:
+        name: vm-cadvisor
+        restart_policy: unless-stopped
+        memory: 128M
+        image: crcdevops/cadvisor:latest
+        hostname: vm-cadvisor
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - /:/rootfs:ro
+          - /var/run:/var/run:ro
+          - /sys:/sys:ro
+          - /var/lib/docker/:/var/lib/docker:ro
+          - /dev/disk/:/dev/disk:ro
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:8080:8080/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.105"
+
+
+    - name: Start node-exporter container
+      docker_container:
+        name: exp-node
+        restart_policy: unless-stopped
+        memory: 128M
+        image: crcdevops/node-exporter:latest
+        hostname: exp-node
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - /proc:/host/proc:ro
+          - /sys:/host/sys:ro
+          - /:/rootfs:ro
+        ports:
+          - "0.0.0.0:9797:9100/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.157"
+        command:
+          - '--path.procfs=/host/proc'
+          - '--path.sysfs=/host/sys'
+          - --collector.filesystem.ignored-mount-points
+          - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+
+    - name: Start alertmanager container
+      docker_container:
+        name: vm-alert
+        restart_policy: unless-stopped
+        memory: 128M
+        image: crcdevops/alert-manager:latest
+        hostname: vm-alert
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-alert:/alertmanager"
+          - "{{ repo_path }}/alert/conf/config.yml:/etc/alertmanager/config.yml"
+          - "{{ repo_path }}/alert/conf/notifications.tmpl:/alertmanager/notifications.tmpl"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:9093:9093/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.106"
+
+        command:
+          - '--config.file=/etc/alertmanager/config.yml'
+          - '--storage.path=/alertmanager'
+
+    - name: Start tomcat container
+      docker_container:
+        name: vm-tomcat
+        restart_policy: unless-stopped
+        memory: 400M
+        image: crcdevops/tomcat:latest
+        hostname: vm-tomcat
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:8888:8080/tcp"
+          - "0.0.0.0:9000:9000/tcp"
+          - "0.0.0.0:8009:8009/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.31"
+
+    - name: Start tomcat exporter container
+      docker_container:
+        name: exp-tomcat
+        restart_policy: unless-stopped
+        memory: 600M
+        image: crcdevops/tomcat-exp:latest
+        hostname: exp-tomcat
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:9072:9072/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.154"
+        env_file: "{{ repo_path }}/exporters/prerequisite/tomcat/env/exporter.env"
+
+    - name: Start nginx container
+      docker_container:
+        name: vm-nginx
+        restart_policy: unless-stopped
+        memory: 128M
+        image: crcdevops/nginx:latest
+        hostname: vm-nginx
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+          - "{{ repo_path }}/nginx/conf/default.conf:/etc/nginx/conf.d/default.conf"
+          - "{{ repo_path }}/nginx/conf/ssl.conf:/etc/nginx/conf.d/ssl.conf"
+          - "{{ repo_path }}/nginx/conf/ssl/server.crt:/etc/nginx/ssl/server.crt"
+          - "{{ repo_path }}/nginx/conf/ssl/server.key:/etc/nginx/ssl/server.key"
+
+        ports:
+          - "0.0.0.0:81:80/tcp"
+          - "0.0.0.0:443:443/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.40"
+
+    - name: Start apache container
+      docker_container:
+        name: vm-apache
+        restart_policy: unless-stopped
+        memory: 128M
+        image: crcdevops/apache:latest
+        hostname: vm-apache
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+          - "{{ repo_path }}/apache/conf/httpd.conf:/usr/local/apache2/conf/httpd.conf"
+          - "{{ repo_path }}/apache/conf/status.conf:/usr/local/apache2/conf/extra/status.conf"
+          - "{{ repo_path }}/apache/conf/sample-app.conf:/usr/local/apache2/conf/extra/sample-app.conf"
+          - "{{ repo_path }}/apache/conf/ssl/server.crt:/usr/local/apache2/conf/server.crt"
+          - "{{ repo_path }}/apache/conf/ssl/server.key:/usr/local/apache2/conf/server.key"
+          - "{{ repo_path }}/apache/conf/httpd-ssl.conf:/usr/local/apache2/conf/extra/httpd-ssl.conf"
+
+        ports:
+          - "0.0.0.0:82:80/tcp"
+          - "0.0.0.0:444:443/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.41"
+
+    - name: Start apache exporter container
+      docker_container:
+        name: exp-apache
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/apache-exp:latest
+        hostname: exp-apache
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:9117:9117/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.152"
+
+    - name: Start redhat exporter container - 1st
+      docker_container:
+        name: vm1-os
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/redhat:latest
+        hostname: vm1-os
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:10001:9100/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.10"
+
+    - name: Start redhat exporter container - 2nd
+      docker_container:
+        name: vm2-os
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/redhat:latest
+        hostname: vm2-os
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:10002:9100/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.11"
+
+    - name: Start redhat telegraf container - 3rd
+      docker_container:
+        name: vm3-os
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/telegraf:latest
+        hostname: vm3-os
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.12"
+        command:
+          - 'telegraf --config /etc/telegraf.conf'
+
+    - name: Start redhat telegraf container - 4th
+      docker_container:
+        name: vm4-os
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/telegraf:latest
+        hostname: vm4-os
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.13"
+        command:
+          - 'telegraf --config /etc/telegraf.conf'
+
+    - name: Start mongodb container
+      docker_container:
+        name: vm-mongodb
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/mongodb:latest
+        hostname: vm-mongodb
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.20"
+
+    - name: Start mongodb exporter
+      docker_container:
+        name: exp-mongodb
+        restart_policy: unless-stopped
+        memory: 32M
+        image: crcdevops/mongodb-exp:latest
+        hostname: exp-mongodob
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:9001:9001/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.150"
+        command:
+          - 'mongodb://vm-mongodb:27017'
+
+    - name: Start mariadb container
+      docker_container:
+        name: vm-mariadb
+        memory: 256M
+        restart_policy: unless-stopped
+        image: crcdevops/mariadb:latest
+        hostname: vm-mariadb
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:3360:3360/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.21"
+        env_file: "{{ repo_path }}/mariadb/env/mariadb.env"
+
+    - name: Start mariadb exporter
+      docker_container:
+        name: exp-mariadb
+        memory: 64M
+        restart_policy: unless-stopped
+        image: crcdevops/mariadb-exp:latest
+        hostname: exp-mariadb
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        ports:
+          - "0.0.0.0:9104:9104/tcp"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.151"
+        env_file: "{{ repo_path }}/exporters/prerequisite/mariadb/env/exporter.env"
+
+
+    - name: Start Janusz Kujawa asystent
+      docker_container:
+        name: vm-asystent
+        memory: 128M
+        restart_policy: unless-stopped
+        image: crcdevops/asystent:latest
+        hostname: vm-asystent
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.70"
+
+    - name: Start redhat nmon container - 1st
+      docker_container:
+        name: vm1-os-nmon
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/nmon-client:latest
+        hostname: vm1-os-nmon
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-nmon:/share"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+          - "{{ repo_path }}/nmon-client/config/root-client.cron:/var/spool/cron/root"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.80"
+        command:
+          - '/usr/sbin/crond -n -x ext'
+
+    - name: Start redhat nmon container - 2nd
+      docker_container:
+        name: vm2-os-nmon
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/nmon-client:latest
+        hostname: vm2-os-nmon
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-nmon:/share"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+          - "{{ repo_path }}/nmon-client/config/root-client.cron:/var/spool/cron/root"
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.81"
+        command:
+          - '/usr/sbin/crond -n -x ext'
+
+    - name: Start redhat nmon container - 3rd
+      docker_container:
+        name: vm3-os-nmon
+        restart_policy: unless-stopped
+        memory: 64M
+        image: crcdevops/nmon-client:latest
+        hostname: vm3-os-nmon
+        volumes:
+          - "/etc/localtime:/etc/localtime:ro"
+          - "crc-nmon:/share"
+          - "{{ repo_path }}/src/etc/hosts:/etc/hosts"
+          - "{{ repo_path }}/nmon-client/config/root-client.cron:/var/spool/cron/root"
+
+        networks:
+          - name: CRC_Net
+            ipv4_address: "10.200.200.82"
+        command:
+          - '/usr/sbin/crond -n -x ext'

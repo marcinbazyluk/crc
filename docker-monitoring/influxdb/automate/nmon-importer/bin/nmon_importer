@@ -1,0 +1,81 @@
+#!/bin/bash
+
+### SCRIPT VARIABLES
+HOSTLIST_AIX="/usr/local/nmon-import/IST_AIX.lst"
+SOURCE_DIR="/etc/perf/daily"
+DESTINATION_DIR_LINUX="/nmons/CURRENT/LINUX"
+NMON_FILES_PATERN="*nmon*"
+DOWNLOAD="/usr/bin/rsync"
+CURRENT_DATE=`date +%y%m%d`
+TRANSFER_LIST_LINUX="/usr/local/nmon-import/db/linux_current_day.csv"
+
+SCRIPT_OUT="/usr/local/nmon-import/logs/regular/run_current.out"
+RUNDATE=`date +%F_%H:%M:%S`
+LINUX_USER="linux_import"
+
+### ZERO FILE TRANSFER CSV FILE
+> $TRANSFER_LIST_AIX
+> $TRANSFER_LIST_LINUX
+
+
+### DECLARE FUNCTION
+
+
+# CREATE TRANSFER LIST
+function f_transfer_list_linux {
+        for server in `cat $HOSTLIST_LINUX |grep -v "^#"`; do
+                (echo -n $server";";ssh oslls@$server "sudo find $SOURCE_DIR -type f -name $server'_'$CURRENT_DATE'*nmon'") >> $TRANSFER_LIST_LINUX;
+        done
+}
+
+# DOWNLOAD NMONS LINUX
+function f_download_linux {
+	echo "*********************************"
+	echo "*** DOWNLOAD NMON FILES LINUX ***"
+	echo "*********************************"
+	while IFS=';' read -r d1 d2
+	do
+		mkdir -p $DESTINATION_DIR_LINUX/$d1
+		filename=`cat $TRANSFER_LIST_LINUX | grep $d1 | awk -F\/ '{ print $5 }'`
+		echo "Starting download procedure: "$RUNDATE
+		echo "Downloading file:"
+		$DOWNLOAD -a --rsync-path="sudo rsync" oslls@$d1:$d2 $DESTINATION_DIR_LINUX"/"$d1 > /dev/null 2>&1
+		echo "++++++++++++++++++++++++++++++++++++"
+		echo "Filename downloaded: "$filename
+		echo "Check file modification: "
+		stat --format "%y" $DESTINATION_DIR_LINUX"/"$d1"/"$filename
+		echo "===================================="
+	done < "$TRANSFER_LIST_LINUX"
+}
+
+function f_permissions_fix {
+		sudo chmod -R 777 $DESTINATION_DIR_LINUX
+
+}
+
+# IMPORT LINUX DATA REMOTELY SERVICED grafana---influxdb
+function f_import_influxdb_linux {
+echo "****************************"
+echo "*** DB IMPORT LINUX DATA ***"
+echo "****************************"
+for line in `cat $TRANSFER_LIST_LINUX`; do
+        i1=`echo $line | awk -F\; '{ print $1 }'`
+        i2=`echo $line | awk -F\; '{ print $2 }' | awk -F\/ '{ print $5 }'`
+        echo "Following file will be imported to InfluxDB: "$i2
+        echo "processing..."
+ 	bash -c "sudo su -c '/usr/local/bin/nmon2influxdb import ${DESTINATION_DIR_LINUX}/${i1}/${i2}' -s /bin/bash $LINUX_USER"
+	echo "-------------------------------------------------------------------------"
+done
+}
+
+# EXECUTION PART
+
+# TRANSFER
+f_transfer_list_linux >> $SCRIPT_OUT
+
+# DOWNLOAD
+f_download_linux >> $SCRIPT_OUT
+f_permissions_fix >> $SCRIPT_OUT
+
+# IMPORT
+f_import_influxdb_linux >> $SCRIPT_OUT

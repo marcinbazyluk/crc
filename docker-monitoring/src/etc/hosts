@@ -1,0 +1,56 @@
+# File copied via ansible automation
+# Do not overwrite file because this is a part of CRC laboratory
+
+127.0.0.1       localhost
+10.200.200.1    docker-server
+
+###                    ###
+# Grafana CRC Laboratory #
+###                    ###
+
+# Main enclouser services
+10.200.200.100  vm-grafana
+10.200.200.101  vm-prometheus
+10.200.200.102  vm-graphite
+10.200.200.103  vm-influxdb
+10.200.200.104  vm-nmon
+10.200.200.105  vm-cadvisor
+10.200.200.106  vm-alert
+
+# Linux container
+10.200.200.10   vm1-os
+10.200.200.11   vm2-os
+
+# Database containers
+10.200.200.20   vm-mongodb
+10.200.200.21   vm-mariadb
+
+# Application server containers
+10.200.200.30   vm-wildfly
+10.200.200.31   vm-tomcat
+
+# Web server containers
+10.200.200.40   vm-nginx
+10.200.200.41   vm-apache
+
+# Messaging containters
+10.200.200.50   vm-rabbitmq
+10.200.200.51   vm-redis
+
+# Data feed containters
+10.200.200.70   vm-asystent
+
+# Nmon client containers produced sample data
+10.200.200.80   vm1-os-nmon
+10.200.200.81   vm2-os-nmon
+10.200.200.82   vm3-os-nmon
+
+# Prometheus exporters
+10.200.200.150  exp-mongodb
+10.200.200.151  exp-mariadb
+10.200.200.152  exp-apache
+10.200.200.153  exp-nginx
+10.200.200.154  exp-tomcat
+10.200.200.155  exp-rabbitmq
+10.200.200.156  exp-redis
+10.200.200.157  exp-node

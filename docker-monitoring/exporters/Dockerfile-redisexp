@@ -1,0 +1,5 @@
+FROM centos:latest
+LABEL author="CRC Team"
+LABEL description="Redis prometheus exporter"
+CMD ["./redis_exporter", "-debug"]
+COPY prerequisite/redis/bin/redis_exporter /

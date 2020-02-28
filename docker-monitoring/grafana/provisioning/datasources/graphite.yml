@@ -1,0 +1,7 @@
+datasources:
+  - name: 'GRAPHITE'
+    type: 'graphite'
+    access: 'proxy'
+    url: 'http://vm-graphite'
+    isDefault: false
+    editable: true

@@ -1,0 +1,881 @@
+# Grafana deployment for education proccess.
+# Author Janusz Kujawa (janusz.kujawa@pl.ibm.com)
+# Date: 25/02/2019
+# Last change: Konfiguracja alertów slack
+
+# Stage lists
+stages:
+- build
+#- dev
+#- preparation
+#- test
+#- quality
+#- production
+#- softlayer
+#- cleanup
+
+# Jobs variables
+variables:
+  # COMMON variables
+  GIT_SSL_NO_VERIFY: "true"
+
+  # Custom Images definition
+  CRCGRAFANA:             crc-grafana:$CI_COMMIT_REF_NAME
+  CRCPROMETHEUS:          crc-prometheus:$CI_COMMIT_REF_NAME
+  CRCINFLUXDB:            crc-influxdb:$CI_COMMIT_REF_NAME
+  CRCASYSTENT:            crc-asystent:$CI_COMMIT_REF_NAME
+  CRCREDHAT:              crc-redhat:$CI_COMMIT_REF_NAME
+  CRCMONGODB:             crc-mongodb:$CI_COMMIT_REF_NAME
+  CRCMARIADB:             crc-mariadb:$CI_COMMIT_REF_NAME
+  CRCWILDFLY:             crc-wildfly:$CI_COMMIT_REF_NAME
+  CRCTOMCAT:              crc-tomcat:$CI_COMMIT_REF_NAME
+  CRCNGINX:               crc-nginx:$CI_COMMIT_REF_NAME
+  CRCAPACHE:              crc-apache:$CI_COMMIT_REF_NAME
+  CRCRABBITMQ:            crc-rabbitmq:$CI_COMMIT_REF_NAME
+  CRCREDIS:               crc-redis:$CI_COMMIT_REF_NAME
+  CRCGRAPHITE:            crc-graphite:$CI_COMMIT_REF_NAME
+  CRCCADVISOR:            crc-cadvisor:$CI_COMMIT_REF_NAME
+  CRCALERT:               crc-alert:$CI_COMMIT_REF_NAME
+
+  CRCMONGODBEXP:          crc-mongodb-exp:$CI_COMMIT_REF_NAME
+  CRCMARIADBEXP:          crc-mariadb-exp:$CI_COMMIT_REF_NAME
+  CRCNGINXEXP:            crc-nginx-exp:$CI_COMMIT_REF_NAME
+  CRCAPACHEEXP:           crc-apache-exp:$CI_COMMIT_REF_NAME
+  CRCTOMCATEXP:           crc-tomcat-exp:$CI_COMMIT_REF_NAME
+  CRCREDISEXP:            crc-redis-exp:$CI_COMMIT_REF_NAME
+  CRCNODEEXP:             crc-node-exporter:$CI_COMMIT_REF_NAME
+
+  CRCNMONIMPORTER:        crc-nmon-importer:$CI_COMMIT_REF_NAME
+  CRCNMONCLIENT:          crc-nmon-client:CI_COMMIT_REF_NAME
+
+  # Docker hub registry tags
+  REMOTE_CRCGRAFANA:      crcdevops/grafana:latest
+  REMOTE_CRCPROMETHEUS:   crcdevops/prometheus:latest
+  REMOTE_CRCINFLUXDB:     crcdevops/influxdb:latest
+  REMOTE_CRCASYSTENT:     crcdevops/asystent:latest
+  REMOTE_CRCREDHAT:       crcdevops/redhat:latest
+  REMOTE_CRCMONGODB:      crcdevops/mongodb:latest
+  REMOTE_CRCMARIADB:      crcdevops/mariadb:latest
+  REMOTE_CRCWILDFLY:      crcdevops/wildfly:latest
+  REMOTE_CRCTOMCAT:       crcdevops/tomcat:latest
+  REMOTE_CRCNGINX:        crcdevops/nginx:latest
+  REMOTE_CRCAPACHE:       crcdevops/apache:latest
+  REMOTE_CRCRABBITMQ:     crcdevops/rabbitmq:latest
+  REMOTE_CRCREDIS:        crcdevops/redis:latest
+  REMOTE_CRCGRAPHITE:     crcdevops/graphite:latest
+  REMOTE_CRCCADVISOR:     crcdevops/cadvisor:latest
+  REMOTE_CRCALERT:        crcdevops/alert-manager:latest
+
+  REMOTE_CRCMONGODBEXP:   crcdevops/mongodb-exp:latest
+  REMOTE_CRCMARIADBEXP:   crcdevops/mariadb-exp:latest
+  REMOTE_CRCNGINXEXP:     crcdevops/nginx-exp:latest
+  REMOTE_CRCAPACHEEXP:    crcdevops/apache-exp:latest
+  REMOTE_CRCTOMCATEXP:    crcdevops/tomcat-exp:latest
+  REMOTE_CRCREDISEXP:     crcdevops/redis-exp:latest
+  REMOTE_CRCNODEEXP:      crcdevops/node-exporter:latest
+
+
+  REMOTE_CRCNMONIMPORTER: crcdevops/nmon-importer:latest
+  REMOTE_CRCNMONCLIENT:   crcdevops/nmon-client:latest
+
+  # Docker files definitions
+  GRAFANA_DF:       ./grafana/Dockerfile
+  PROMETHEUS_DF:    ./prometheus/Dockerfile
+  INFLUXDB_DF:      ./influxdb/Dockerfile
+  ASYSTENT_DF:      ./asystent/Dockerfile
+  REDHAT_DF:        ./redhat/Dockerfile
+  REDHATNMON_DF:    ./redhat-nmon/Dockerfile
+  MONGODB_DF:       ./mongodb/Dockerfile
+  MARIADB_DF:       ./mariadb/Dockerfile
+  WILDFLY_DF:       ./wildfly/Dockerfile
+  TOMCAT_DF:        ./tomcat/Dockerfile
+  NGINX_DF:         ./nginx/Dockerfile
+  APACHE_DF:        ./apache/Dockerfile
+  RABBITMQ_DF:      ./rabbitmq/Dockerfile
+  REDIS_DF:         ./redis/Dockerfile
+  GRAPHITE_DF:      ./graphite/Dockerfile
+  CADVISOR_DF:      ./cadvisor/Dockerfile
+  ALERT_DF:         ./alert/Dockerfile
+
+  MONGODBEXP_DF:    ./exporters/Dockerfile-mongodbexp
+  MARIADBEXP_DF:    ./exporters/Dockerfile-mariadbexp
+  NGINXEXP_DF:      ./exporters/Dockerfile-nginxexp
+  APACHEEXP_DF:     ./exporters/Dockerfile-apacheexp
+  TOMCATEXP_DF:     ./exporters/Dockerfile-tomcatexp
+  REDISEXP_DF:      ./exporters/Dockerfile-redisexp
+  NODEEXP_DF:       ./exporters/Dockerfile-nodeexp
+
+  IMPORTER_DF:      ./nmon-importer/Dockerfile
+  CLIENT_DF:        ./nmon-client/Dockerfile
+
+  # Temporary name for test docker containers
+  GRAFANA_TMP:     TMP_grafana_server
+  PROMETHEUS_TMP:  TMP_prometheus_server
+  INFLUXDB_TMP:    TMP_influxdb_server
+  ASYSTENT_TMP:    TMP_asystent
+  NJMON_TMP:       TMP_njmon
+  RHEL_TMP:        TMP_redhat_exporter
+  RHELNMON_TMP:    TMP_redhat_nmon_exporter
+  MONGODB_TMP:     TMP_mongodb_server
+  MARIADB_TMP:     TMP_mariadb_server
+  WILDFLY_TMP:     TMP_wildfly_app
+  TOMCAT_TMP:      TMP_tomcat_app
+  NGINX_TMP:       TMP_nginx_server
+  APACHE_TMP:      TMP_apache_server
+  RABBITMQ_TMP:    TMP_rabbitmq_server
+  REDIS_TMP:       TMP_redis_server
+  GRAPHITE_TMP :   TMP_graphite_server
+  CADVISOR_TMP :   TMP_cadvisor_server
+  ALERT_TMP :      TMP_alert
+
+
+  MONGODBEXP_TMP:  TMP_mongodb_exporter
+  MARIADBEXP_TMP:  TMP_mariadb_exporter
+  NGINXEXP_TMP:    TMP_nginx_exporter
+  APACHEEXP_TMP:   TMP_apache_exporter
+  TOMCATEXP_TMP:   TMP_redis_exporter
+  NODEEXP_TMP:     TMP_node_exporter
+
+
+  # Permanent name containers for docker engine
+  GRAFANA_SERVER:      vm-grafana                 # In docker compose
+  PROMETHEUS_SERVER:   vm-prometheus              # In docker compose
+  REDHAT_NODE1:        vm1-os                     # In docker compose
+  REDHAT_NODE2:        vm2-os                     # In docker compose
+  NMON_REDHAT_NODE1:   vm1-nmon                   # Not yet
+  NMON_REDHAT_NODE2:   vm2-nmon                   # Not yet
+  MONGODB_NODE:        vm-mongodb                 # In docker compose
+  MARIADB_NODE:        vm-mariadb                 # In docker compose
+  WILDFLY_NODE:        vm-wildfly                 # Not yet
+  TOMCAT_NODE:         vm-tomcat                  # In docker compose
+  NGINX_NODE:          vm-nginx                   # In docker compose
+  APACHE_NODE:         vm-apache                  # In docker compose
+  RABBITMQ_NODE:       vm-rabbitmq                # Not yet
+  REDIS_NODE:          vm-redis                   # Not yet
+  GRAPHITE_NODE:       vm-graphite                # In docker compose
+  INFLUXDB_NODE:       vm-influxdb                # In docker compose
+  ASYSTENT_NODE:       vm-asystent                # Not yet
+  NJMON_NODE:          vm-njmon                   # Not yet
+  CADVISOR_NODE:       vm-cadvisor                # Inprogress
+  ALERT_NODE:          vm-alert                   # Inprogress
+
+
+  # Exporters as a containers
+  EXP_MONGODB:      exp-mongodb                   # Not yet
+  EXP_MARIADB:      exp-mariadb                   # Not yet
+  EXP_NGINX:        exp-nginx                     # Not yet
+  EXP_APACHE:       exp-apache                    # Not yet
+  EXP_TOMCAT:       exp-tomcat                    # Not yet
+  EXP_REDIS:        exp-redis                     # Not yet
+  EXP_NODE:         exp-node                      # In docker compose
+
+  IMPORTER:         vm-nmon                       # Not yet
+  CLIENT1:          vm1-os-nmon                   # Not yet
+  CLIENT2:          vm2-os-nmon                   # Not yet
+  CLIENT3:          vm3-os-nmon                   # Not yet
+
+
+  # IP Addresses definition
+  GRAFANA_SERVER_IP:     10.200.200.100
+  PROMETHEUS_SERVER_IP:  10.200.200.101
+  GRAPHITE_NODE_IP:      10.200.200.102
+  INFLUXDB_NODE_IP:      10.200.200.103
+  IMPORTER_NODE_IP:      10.200.200.104
+  CADVISOR_NODE_IP:      10.200.200.105
+  ALERT_NODE_IP:         10.200.200.106
+
+  REDHAT_NODE1_IP:       10.200.200.10
+  REDHAT_NODE2_IP:       10.200.200.11
+  NMON_REDHAT_NODE1_IP:  10.200.200.12
+  NMON_REDHAT_NODE2_IP:  10.200.200.13
+
+  MONGODB_NODE_IP:       10.200.200.20
+  MARIADB_NODE_IP:       10.200.200.21
+
+  WILDFLY_NODE_IP:       10.200.200.30
+  TOMCAT_NODE_IP:        10.200.200.31
+
+  NGINX_NODE_IP:         10.200.200.40
+  APACHE_NODE_IP:        10.200.200.41
+
+  RABBITMQ_NODE_IP:      10.200.200.50
+  REDIS_NODE_IP:         10.200.200.51
+
+  ASYSTENT_NODE_IP:      10.200.200.70
+
+  EXP_MONGODB_IP:        10.200.200.150
+  EXP_MARIADB_IP:        10.200.200.151
+  EXP_APACHE_IP:         10.200.200.152
+  EXP_NGINX_IP:          10.200.200.153
+  EXP_TOMCAT_IP:         10.200.200.154
+  EXP_RABBITMQ_IP:       10.200.200.155
+  EXP_REDIS_IP:          10.200.200.156
+  EXP_NODE_IP:           10.200.200.157
+
+  CLIENT1_NODE_IP:       10.200.200.80
+  CLIENT2_NODE_IP:       10.200.200.81
+  CLIENT3_NODE_IP:       10.200.200.82
+
+
+images:
+  stage: build
+  before_script:
+    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+  script:
+    # Grafana dashboard server:
+    - docker build -t $CRCGRAFANA -f $GRAFANA_DF ./grafana
+    - docker tag $CRCGRAFANA $REMOTE_CRCGRAFANA
+
+    # Prometheus Server Node:
+    - docker build -t $CRCPROMETHEUS -f $PROMETHEUS_DF ./prometheus
+    - docker tag $CRCPROMETHEUS $REMOTE_CRCPROMETHEUS
+
+    # RedHat Node:
+    - docker build -t $CRCREDHAT -f $REDHAT_DF ./redhat
+    - docker tag $CRCREDHAT $REMOTE_CRCREDHAT
+
+    # MongoDB Server Node:
+    - docker build -t $CRCMONGODB -f $MONGODB_DF ./mongodb
+    - docker tag $CRCMONGODB $REMOTE_CRCMONGODB
+
+    # MariaDB Server Node:
+    - docker build -t $CRCMARIADB -f $MARIADB_DF ./mariadb
+    - docker tag $CRCMARIADB $REMOTE_CRCMARIADB
+
+    # Wildfly Server Node:
+    - docker build -t $CRCWILDFLY -f $WILDFLY_DF ./wildfly
+    - docker tag $CRCWILDFLY $REMOTE_CRCWILDFLY
+
+    # Tomcat Server Node:
+    - docker build -t $CRCTOMCAT -f $TOMCAT_DF ./tomcat
+    - docker tag $CRCTOMCAT $REMOTE_CRCTOMCAT
+
+    # Apache Server Node:
+    - docker build -t $CRCAPACHE -f $APACHE_DF ./apache
+    - docker tag $CRCAPACHE $REMOTE_CRCAPACHE
+
+    # Nginx Server Node:
+    - docker build -t $CRCNGINX -f $NGINX_DF ./nginx
+    - docker tag $CRCNGINX $REMOTE_CRCNGINX
+
+    # Rabbitmq Server Node:
+    - docker build -t $CRCRABBITMQ -f $RABBITMQ_DF ./rabbitmq
+    - docker tag $CRCRABBITMQ $REMOTE_CRCRABBITMQ
+
+    # Redis Node:
+    - docker build -t $CRCREDIS -f $REDIS_DF ./redis
+    - docker tag $CRCREDIS $REMOTE_CRCREDIS
+
+    # Graphite Node:
+    - docker build -t $CRCGRAPHITE -f $GRAPHITE_DF ./graphite
+    - docker tag $CRCGRAPHITE $REMOTE_CRCGRAPHITE
+
+    # InfluxDB Node:
+    - docker build -t $CRCINFLUXDB -f $INFLUXDB_DF ./influxdb
+    - docker tag $CRCINFLUXDB $REMOTE_CRCINFLUXDB
+
+    # Cwiczenie 10 Asystent Node:
+    - docker build -t $CRCASYSTENT -f $ASYSTENT_DF ./asystent
+    - docker tag $CRCASYSTENT $REMOTE_CRCASYSTENT
+
+    # Cadvisor Node:
+    - docker build -t $CRCCADVISOR -f $CADVISOR_DF ./cadvisor
+    - docker tag $CRCCADVISOR $REMOTE_CRCCADVISOR
+
+    # Alertmanager Node:
+    - docker build -t $CRCALERT -f $ALERT_DF ./alert
+    - docker tag $CRCALERT $REMOTE_CRCALERT
+
+    # MongoDB node exporter:
+    - docker build -t $CRCMONGODBEXP -f $MONGODBEXP_DF ./exporters
+    - docker tag $CRCMONGODBEXP $REMOTE_CRCMONGODBEXP
+
+    # MariaDB node exporter:
+    - docker build -t $CRCMARIADBEXP -f $MARIADBEXP_DF ./exporters
+    - docker tag $CRCMARIADBEXP $REMOTE_CRCMARIADBEXP
+
+    # Apache node exporter:
+    - docker build -t $CRCAPACHEEXP -f $APACHEEXP_DF ./exporters
+    - docker tag $CRCAPACHEEXP $REMOTE_CRCAPACHEEXP
+
+    # Nginx node exporter:
+    - docker build -t $CRCNGINXEXP -f $NGINXEXP_DF ./exporters
+    - docker tag $CRCNGINXEXP $REMOTE_CRCNGINXEXP
+
+    # Tomcat node exporter:
+    - docker build -t $CRCTOMCATEXP -f $TOMCATEXP_DF ./exporters
+    - docker tag $CRCTOMCATEXP $REMOTE_CRCTOMCATEXP
+
+    # Redis node exporter:
+    - docker build -t $CRCREDISEXP -f $REDISEXP_DF ./exporters
+    - docker tag $CRCREDISEXP $REMOTE_CRCREDISEXP
+
+    # Node node exporter:
+    - docker build -t $CRCNODEEXP -f $NODEEXP_DF ./exporters
+    - docker tag $CRCNODEEXP $REMOTE_CRCNODEEXP
+
+    # NMON Importer node:
+    - docker build -t $CRCNMONIMPORTER -f $IMPORTER_DF ./nmon-importer
+    - docker tag $CRCNMONIMPORTER $REMOTE_CRCNMONIMPORTER
+
+    # NMON Client node:
+    - docker build -t $CRCNMONCLIENT -f $CLIENT_DF ./nmon-client
+    - docker tag $CRCNMONCLIENT $REMOTE_CRCNMONCLIENT
+
+
+
+  after_script:
+    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+    - docker push $REMOTE_CRCGRAFANA
+    - docker push $REMOTE_CRCPROMETHEUS
+    - docker push $REMOTE_CRCREDHAT
+    - docker push $REMOTE_CRCMONGODB
+    - docker push $REMOTE_CRCMARIADB
+    - docker push $REMOTE_CRCWILDFLY
+    - docker push $REMOTE_CRCTOMCAT
+    - docker push $REMOTE_CRCAPACHE
+    - docker push $REMOTE_CRCNGINX
+    - docker push $REMOTE_CRCRABBITMQ
+    - docker push $REMOTE_CRCREDIS
+    - docker push $REMOTE_CRCGRAPHITE
+    - docker push $REMOTE_CRCINFLUXDB
+    - docker push $REMOTE_CRCASYSTENT
+    - docker push $REMOTE_CRCCADVISOR
+    - docker push $REMOTE_CRCALERT
+    - docker push $REMOTE_CRCMONGODBEXP
+    - docker push $REMOTE_CRCMARIADBEXP
+    - docker push $REMOTE_CRCAPACHEEXP
+    - docker push $REMOTE_CRCNGINXEXP
+    - docker push $REMOTE_CRCTOMCATEXP
+    - docker push $REMOTE_CRCNODEEXP
+    - docker push $REMOTE_CRCNMONIMPORTER
+    - docker push $REMOTE_CRCNMONCLIENT
+
+  tags:
+    - dev
+
+
+#grafana_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $GRAFANA_TMP)" == "" ]; then echo "OK - "$GRAFANA_TMP" does not exist"; else echo "ERROR - "$GRAFANA_TMP" will be deleted..."; docker rm -f $GRAFANA_TMP ; fi);
+#  script:
+#    - docker run -d --name $GRAFANA_TMP $REMOTE_CRCGRAFANA
+#    - docker logs $GRAFANA_TMP
+#  tags:
+#    - dev
+
+
+#prometheus_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $PROMETHEUS_TMP)" == "" ]; then echo "OK - "$PROMETHEUS_TMP" does not exist"; else echo "ERROR - "$PROMETHEUS_TMP" will be deleted..."; docker rm -f $PROMETHEUS_TMP ; fi);
+#  script:
+#    - docker run -d --name $PROMETHEUS_TMP $REMOTE_CRCPROMETHEUS
+#    - docker logs $PROMETHEUS_TMP
+#  tags:
+#    - dev
+
+#mongodb_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $MONGODB_TMP)" == "" ]; then echo "OK - "$MONGODB_TMP" does not exist"; else echo "ERROR - "$MONGODB_TMP" will be deleted..."; docker rm -f $MONGODB_TMP ; fi);
+#  script:
+#    - docker run -d --name $MONGODB_TMP $REMOTE_CRCMONGODB
+#    - docker logs $MONGODB_TMP
+#  tags:
+#    - dev
+
+#mariadb_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $MARIADB_TMP)" == "" ]; then echo "OK - "$MARIADB_TMP" does not exist"; else echo "ERROR - "$MARIADB_TMP" will be deleted..."; docker rm -f $MARIADB_TMP ; fi);
+#  script:
+#    - docker run -d --name $MARIADB_TMP $REMOTE_CRCMARIADB
+#    - docker logs $MARIADB_TMP
+#  tags:
+#    - dev
+
+#tomcat_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $TOMCAT_TMP)" == "" ]; then echo "OK - "$TOMCAT_TMP" does not exist"; else echo "ERROR - "$TOMCAT_TMP" will be deleted..."; docker rm -f $TOMCAT_TMP ; fi);
+#  script:
+#    - docker run -d --name $TOMCAT_TMP $REMOTE_CRCTOMCAT
+#    - docker logs $TOMCAT_TMP
+#  tags:
+#    - dev
+
+#apache_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $APACHE_TMP)" == "" ]; then echo "OK - "$APACHE_TMP" does not exist"; else echo "ERROR - "$APACHE_TMP" will be deleted..."; docker rm -f $APACHE_TMP ; fi);
+#  script:
+#    - docker run -d --name $APACHE_TMP -p 0.0.0.0:81:80/tcp $REMOTE_CRCAPACHE
+#    - docker logs $APACHE_TMP
+#  tags:
+#    - dev
+
+#nginx_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $NGINX_TMP)" == "" ]; then echo "OK - "$NGINX_TMP" does not exist"; else echo "ERROR - "$NGINX_TMP" will be deleted..."; docker rm -f $NGINX_TMP ; fi);
+#  script:
+#    - docker run -d --name $NGINX_TMP -p 0.0.0.0:82:80/tcp $REMOTE_CRCNGINX
+#    - docker logs $NGINX_TMP
+
+#  tags:
+#    - dev
+
+
+#rabbitmq_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $RABBITMQ_TMP)" == "" ]; then echo "OK - "$RABBITMQ_TMP" does not exist"; else echo "ERROR - "$RABBITMQ_TMP" will be deleted..."; docker rm -f $RABBITMQ_TMP ; fi);
+#  script:
+#    - docker run -d --name $RABBITMQ_TMP $REMOTE_CRCRABBITMQ
+#    - docker logs $RABBITMQ_TMP
+#
+#  tags:
+#    - dev
+
+
+#redis_server:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $REDIS_TMP)" == "" ]; then echo "OK - "$REDIS_TMP" does not exist"; else echo "ERROR - "$REDIS_TMP" will be deleted..."; docker rm -f $REDIS_TMP ; fi);
+#  script:
+#    - docker run -d --name $REDIS_TMP $REMOTE_CRCREDIS
+#    - docker logs $REDIS_TMP
+#
+#  tags:
+#    - dev
+
+
+#node_exporters:
+#  stage: dev
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - (if [ "$(docker ps -a | grep $RHEL_TMP)" == "" ]; then echo "OK -"$RHEL_TMP" does not exist"; else echo "ERROR - "$RHEL_TMP" will be deleted..."; docker rm -f $RHEL_TMP ; fi);
+#    - (if [ "$(docker ps -a | grep $MONGODBEXP_TMP)" == "" ]; then echo "OK - "$MONGODBEXP_TMP" does not exist"; else echo "ERROR - "$MONGODBEXP_TMP" will be deleted..."; docker rm -f $MONGODBEXP_TMP ; fi);
+#    - (if [ "$(docker ps -a | grep $MARIADBEXP_TMP)" == "" ]; then echo "OK - "$MARIADBEXP_TMP" does not exist"; else echo "ERROR - "$MARIADBEXP_TMP" will be deleted..."; docker rm -f $MARIADBEXP_TMP ; fi);
+#    - (if [ "$(docker ps -a | grep $APACHEEXP_TMP)" == "" ]; then echo "OK - "$APACHEEXP_TMP" does not exist"; else echo "ERROR - "$APACHEEXP_TMP" will be deleted..."; docker rm -f $APACHEEXP_TMP ; fi);
+#    - (if [ "$(docker ps -a | grep $NGINXEXP_TMP)" == "" ]; then echo "OK - "$NGINXEXP_TMP" does not exist"; else echo "ERROR - "$NGINXEXP_TMP" will be deleted..."; docker rm -f $NGINXEXP_TMP ; fi);
+#    - (if [ "$(docker ps -a | grep $TOMCATEXP_TMP)" == "" ]; then echo "OK - "$TOMCATEXP_TMP" does not exist"; else echo "ERROR - "$TOMCATEXP_TMP" will be deleted..."; docker rm -f $TOMCATEXP_TMP ; fi);
+
+
+#  script:
+#    - docker run -d --name $RHEL_TMP $REMOTE_CRCREDHAT
+#    - docker run -d --name $MONGODBEXP_TMP $REMOTE_CRCMONGODBEXP
+#    - docker run -d --name $MARIADBEXP_TMP $REMOTE_CRCMARIADBEXP
+#    - docker run -d --name $APACHEEXP_TMP $REMOTE_CRCAPACHEEXP
+#    - docker run -d --name $NGINXEXP_TMP $REMOTE_CRCNGINXEXP
+#    - docker run -d --name $TOMCATEXP_TMP $REMOTE_CRCTOMCATEXP
+#    - docker logs $RHEL_TMP
+#    - docker logs $MONGODBEXP_TMP
+#    - docker logs $MARIADBEXP_TMP
+#    - docker logs $APACHEEXP_TMP
+#    - docker logs $NGINXEXP_TMP
+#    - docker logs $TOMCATEXP_TMP
+#  after_script:
+#    - docker stop $RHEL_TMP $MONGODBEXP_TMP $MARIADBEXP_TMP $MARIADB_TMP $MONGODB_TMP $TOMCAT_TMP $APACHE_TMP $NGINX_TMP $RABBITMQ_TMP $REDIS_TMP $GRAFANA_TMP $PROMETHEUS_TMP $APACHEEXP_TMP $NGINXEXP_TMP $TOMCATEXP_TMP
+#  tags:
+#    - dev
+
+
+
+
+########################################################################
+### PLEASE REMOVE COMMENT WHEN TEST DOCKER COMPOSE PART WILL BE FINISH #
+########################################################################
+
+#network:
+#  stage: preparation
+#  before_script:
+#    - (if [ "$(docker network ls | grep CRC_Net)" == "" ]; then echo "OK - CRC_Net does not exist"; else echo "ERROR - CRC_Net will be deleted..."; docker network rm CRC_Net ; fi);
+#  script:
+#    - docker network create --driver bridge --ipv6=false --subnet=10.200.200.0/24 CRC_Net
+#  tags:
+#    - test
+
+# Grafana central container
+#vm_grafana_server:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCGRAFANA
+#    - docker run -d --name=$GRAFANA_SERVER -v `pwd`/src/etc/hosts:/etc/hosts -v `pwd`/grafana/scripts:/var/lib/grafana/custom --network CRC_Net --ip $GRAFANA_SERVER_IP -p 0.0.0.0:3000:3000/tcp $REMOTE_CRCGRAFANA
+#  after_script:
+#    - docker ps -a | grep $GRAFANA_SERVER
+#    - sleep 30
+#    - docker restart $GRAFANA_SERVER
+#    - sleep 30
+#    - docker exec -i $GRAFANA_SERVER bash -c 'cd /var/lib/grafana/custom; ./create-folders.api admin admin; ./organisation.api admin admin; ./users.api admin admin; ./install-plugins.sh'
+#    - sleep 30
+#    - docker restart $GRAFANA_SERVER
+#    - docker logs $GRAFANA_SERVER
+#  tags:
+#    - test
+
+
+# Prometheus central container
+#vm_prometheus_server:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCPROMETHEUS
+#    - docker run -d --name=$PROMETHEUS_SERVER -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $PROMETHEUS_SERVER_IP -p 0.0.0.0:9999:9090/tcp $REMOTE_CRCPROMETHEUS
+#  after_script:
+#    - docker ps -a | grep $PROMETHEUS_SERVER
+#    - docker logs $PROMETHEUS_SERVER
+#  tags:
+#    - test
+
+
+# Tomcat cointainer
+#vm_tomcat:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCTOMCAT
+#    - docker run -d --name=$TOMCAT_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $TOMCAT_NODE_IP -p 0.0.0.0:8888:8080/tcp -p 0.0.0.0:9000:9000 $REMOTE_CRCTOMCAT
+#  after_script:
+#    - docker ps -a | grep $TOMCAT_NODE
+#    - docker logs $TOMCAT_NODE
+#  tags:
+#    - test
+
+
+# Apache cointainer
+#vm_apache:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCAPACHE
+#    - docker run -d --name=$APACHE_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $APACHE_NODE_IP -p 0.0.0.0:81:80/tcp $REMOTE_CRCAPACHE
+#  after_script:
+#    - docker ps -a | grep $APACHE_NODE
+#    - docker logs $APACHE_NODE
+#  tags:
+#    - test
+
+
+# Apache cointainer
+#vm_nginx:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCNGINX
+#    - docker run -d --name=$NGINX_NODE -v `pwd`/exporters/prerequisite/nginx/default.conf:/etc/nginx/conf.d/default.conf -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $NGINX_NODE_IP -p 0.0.0.0:82:80/tcp $REMOTE_CRCNGINX
+#  after_script:
+#    - docker ps -a | grep $NGINX_NODE
+#    - docker logs $NGINX_NODE
+#  tags:
+#    - test
+
+# Rabbitmq cointainer
+#vm_rabbitmq:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCRABBITMQ
+#    - docker run -d --name=$RABBITMQ_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $RABBITMQ_NODE_IP -p 0.0.0.0:15672:15672 $REMOTE_CRCRABBITMQ
+#  after_script:
+#    - docker exec -i $RABBITMQ_NODE bash -c '/scripts/install-exporter.sh; rabbitmq-plugins list'
+#    - docker restart $RABBITMQ_NODE
+#    - docker exec -i $RABBITMQ_NODE bash -c 'rabbitmq-plugins list'
+#    - docker ps -a | grep $RABBITMQ_NODE
+#    - docker logs $RABBITMQ_NODE
+#  tags:
+#    - test
+
+#vm_redis:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCREDIS
+#    - docker run -d --name=$REDIS_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $REDIS_NODE_IP -p 0.0.0.0:19121:9121 $REMOTE_CRCREDIS
+#  after_script:
+#    - docker ps -a | grep $REDIS_NODE
+#    - docker logs $REDIS_NODE
+#  tags:
+#    - test
+
+
+
+# Redhat cointainers
+#vm1_os:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCREDHAT
+#    - docker run -d --name=$REDHAT_NODE1 -m 128M -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $REDHAT_NODE1_IP -p 0.0.0.0:10001:9100 $REMOTE_CRCREDHAT
+#  after_script:
+#    - docker ps -a | grep $REDHAT_NODE
+#    - docker logs $REDHAT_NODE
+#  tags:
+#    - test
+
+#vm2_os:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCREDHAT
+#    - docker run -d --name=$REDHAT_NODE2 -m 128M -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $REDHAT_NODE2_IP -p 0.0.0.0:10002:9100 $REMOTE_CRCREDHAT
+#  after_script:
+#    - docker ps -a | grep $REDHAT_NODE2
+#    - docker logs $REDHAT_NODE2
+#  tags:
+#    - test
+
+# Redhat nmon containers
+
+#vm_nmon_01:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCREDHATNMON
+#    - docker run -d --name=$NMON_REDHAT_NODE1 -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $NMON_REDHAT_NODE1_IP $REMOTE_CRCREDHATNMON
+#  after_script:
+#    - docker ps -a | grep $NMON_REDHAT_NODE1
+#    - docker logs $NMON_REDHAT_NODE1
+#  tags:
+#    - test
+
+#vm_nmon_02:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCREDHATNMON
+#    - docker run -d --name=$NMON_REDHAT_NODE2 -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $NMON_REDHAT_NODE2_IP $REMOTE_CRCREDHATNMON
+#  after_script:
+#    - docker ps -a | grep $NMON_REDHAT_NODE2
+#    - docker logs $NMON_REDHAT_NODE2
+#  tags:
+#    - test
+
+# MongoDB container
+#vm_mongodb:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCMONGODB
+#    - docker run -d --name=$MONGODB_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $MONGODB_NODE_IP $REMOTE_CRCMONGODB
+#  after_script:
+#    - docker ps -a | grep $MONGODB_NODE
+#    - docker logs $MONGODB_NODE
+#  tags:
+#    - test
+
+
+# MariaDB container
+#vm_mariadb:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCMARIADB
+#    - docker run -d --name=$MARIADB_NODE -e MYSQL_ROOT_PASSWORD=crc2019 -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $MARIADB_NODE_IP -p 0.0.0.0:3306:3306 $REMOTE_CRCMARIADB
+#  after_script:
+#    - docker ps -a | grep $MARIADB_NODE
+#    - sleep 120
+#    - docker exec -i $MARIADB_NODE bash -c 'mysql -u root -pcrc2019 < /usr/local/bin/exporter-credential.sql'
+#    - docker logs $MARIADB_NODE
+#  tags:
+#    - test
+
+
+# Graphite container
+#vm_graphite:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCGRAPHITE
+#    - docker run -d --name=$GRAPHITE_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $GRAPHITE_NODE_IP -p 0.0.0.0:80:80 -p 0.0.0.0:2003-2004:2003-2004 -p 0.0.0.0:2023-2024:2023-2024 -p 0.0.0.0:8125:8125/udp -p 0.0.0.0:8126:8126 $REMOTE_CRCGRAPHITE
+#  after_script:
+#    - docker ps -a | grep $GRAPHITE_NODE
+#    - docker logs $GRAPHITE_NODE
+#  tags:
+#    - test
+
+# Graphite container
+#vm_influxdb:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#    - docker pull $REMOTE_CRCINFLUXDB
+#    - docker run -d --name=$INFLUXDB_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $INFLUXDB_NODE_IP -p 0.0.0.0:8086:8086 $REMOTE_CRCINFLUXDB
+#  after_script:
+#    - docker exec -i $INFLUXDB_NODE bash -c '/scripts/init-datasources.sh'
+#    - docker exec -i $INFLUXDB_NODE bash -c '/scripts/cwiczenie10.sh'
+#    - docker ps -a | grep $INFLUXDB_NODE
+#    - docker logs $INFLUXDB_NODE
+#  tags:
+#    - test
+
+
+# Asystent cwiczenie 10 container
+#vm_asystent:
+#  stage: test
+#  before_script:
+#   - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#   - docker pull $REMOTE_CRCASYSTENT
+#   - docker run -d --name=$ASYSTENT_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $ASYSTENT_NODE_IP $REMOTE_CRCASYSTENT
+#  after_script:
+#   - docker ps -a | grep $ASYSTENT_NODE
+#   - docker logs $ASYSTENT_NODE
+#  tags:
+#   - test
+
+#vm_cadvisor:
+#  stage: test
+#  before_script:
+#   - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#   - docker pull $REMOTE_CRCCADVISOR
+#   - docker run -d --name=$CADVISOR_NODE -v `pwd`/src/etc/hosts:/etc/hosts -v /:/rootfs:ro -v /var/run:/var/run:ro -v /sys:/sys:ro -v /var/lib/docker/:/var/lib/docker:ro -v /dev/disk/:/dev/disk:ro --network CRC_Net --ip $CADVISOR_NODE_IP -p 0.0.0.0:8889:8080 $REMOTE_CRCCADVISOR
+#  after_script:
+#   - docker ps -a | grep $CADVISOR_NODE
+#   - docker logs $CADVISOR_NODE
+#  tags:
+#   - test
+
+
+#vm_alert:
+#  stage: test
+#  before_script:
+#   - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#  script:
+#   - docker pull $REMOTE_CRCALERT
+#   - docker run -d --name=$ALERT_NODE -v `pwd`/src/etc/hosts:/etc/hosts -v `pwd`/alert/conf/config.yml:/etc/alertmanager/alertmanager.yml --network CRC_Net --ip $ALERT_NODE_IP -p 0.0.0.0:9993:9093 $REMOTE_CRCALERT
+#  after_script:
+#   - docker ps -a | grep $ALERT_NODE
+#   - docker logs $ALERT_NODE
+#  tags:
+#   - test
+
+
+#app_exporters:
+#  stage: test
+#  before_script:
+#    - docker login -u $DOCKER_HUB_LOGIN -p $DOCKER_HUB_PASS $DOCKER_HUB_REGISTRY
+#    - docker pull $REMOTE_CRCMONGODBEXP
+#    - docker pull $REMOTE_CRCMARIADBEXP
+#    - docker pull $REMOTE_CRCAPACHEEXP
+#    - docker pull $REMOTE_CRCNGINXEXP
+#    - docker pull $REMOTE_CRCTOMCATEXP
+#    - docker pull $REMOTE_CRCNODEEXP
+#  script:
+#    - docker run -d --name=$EXP_MONGODB -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $EXP_MONGODB_IP -p 0.0.0.0:9001:9001 $REMOTE_CRCMONGODBEXP mongodb://vm-mongodb:27017
+#    - docker run -d --name=$EXP_MARIADB -e DATA_SOURCE_NAME="exporter:crc2019@(vm-mariadb:3306)/" -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $EXP_MARIADB_IP -p 0.0.0.0:9104:9104 $REMOTE_CRCMARIADBEXP
+#    - docker run -d --name=$EXP_APACHE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $EXP_APACHE_IP -p 0.0.0.0:9117:9117 $REMOTE_CRCAPACHEEXP
+#    - docker run -d --name=$EXP_NGINX -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $EXP_NGINX_IP -p 0.0.0.0:9113:9113 $REMOTE_CRCNGINXEXP -nginx.scrape-uri http://$NGINX_NODE:80/status
+#    - docker run -d --name=$EXP_TOMCAT -v `pwd`/src/etc/hosts:/etc/hosts -e DEST_PORT=9000 -e DEST_HOST=vm-tomcat --network CRC_Net --ip $EXP_TOMCAT_IP -p 0.0.0.0:9072:9072 $REMOTE_CRCTOMCATEXP
+#    - docker run -d --name=$EXP_REDIS -v `pwd`/src/etc/hosts:/etc/hosts -e REDIS_ADDR='redis://vm-redis:6379' -e REDIS_ALIAS='lab01-redis' --network CRC_Net --ip $EXP_REDIS_IP -p 0.0.0.0:9122:9121 $REMOTE_CRCREDISEXP
+#    - docker run -d --name=$EXP_NODE -v `pwd`/src/etc/hosts:/etc/hosts --network CRC_Net --ip $EXP_NODE_IP -p 0.0.0.0:9797:9100 $REMOTE_CRCNODEEXP
+#  after_script:
+#    - docker ps -a --filter="name=exp-*"
+#    #- docker logs $EXP_MONGODB
+#    #- docker logs $EXP_MARIADB
+#    #- docker logs $EXP_APACHE
+
+#  tags:
+#    - test
+
+
+#remove_dev_vms:
+#  stage: cleanup
+#  before_script:
+#    - docker ps -a --filter="name=TMP_*"
+#  script:
+#    - docker rm -f $(docker ps -a --format '{{.Names}}' --filter="name=TMP_*")
+#  tags:
+#    - dev
+#  when: manual
+
+
+#remove_dev_images:
+#  stage: cleanup
+#  before_script:
+#    - docker images --format "{{.Repository}}:{{.Tag}}" | grep crc
+#  script:
+#    - docker rmi -f $(docker images --format "{{.Repository}}:{{.Tag}}" | grep crc)
+#  tags:
+#    - dev
+#  when: manual
+
+
+#remove_dev_network:
+#  stage: cleanup
+#  script:
+#    - docker network rm CRC_Net
+#  tags:
+#    - dev
+#  when: manual
+
+#remove_test_volume:
+#  stage: cleanup
+#  before_script:
+#    - docker volume ls
+#  script:
+#    - docker volume prune -f
+#  tags:
+#    - test
+#  when: manual
+
+
+#remove_test_vms:
+#  stage: cleanup
+#  before_script:
+#    - docker ps -a --filter="name=vm-*"
+#    - docker ps -a --filter="name=exp-*"
+#  script:
+#    - docker rm -f $(docker ps -a --format '{{.Names}}' --filter="name=vm-*")
+#    - docker rm -f $(docker ps -a --format '{{.Names}}' --filter="name=exp-*")
+#  tags:
+#    - test
+#  when: manual
+
+
+#remove_test_images:
+#  stage: cleanup
+#  before_script:
+#    - docker images --format "{{.Repository}}:{{.Tag}}" | grep crc
+#  script:
+#    - docker rmi -f $(docker images --format "{{.Repository}}:{{.Tag}}" | grep crc)
+#  tags:
+#    - test
+#  when: manual
+
+
+#remove_test_network:
+#  stage: cleanup
+#  script:
+#    - docker network rm CRC_Net
+#  tags:
+#    - test
+#  when: manual

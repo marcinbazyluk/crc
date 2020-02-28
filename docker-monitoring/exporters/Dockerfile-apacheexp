@@ -1,0 +1,5 @@
+FROM centos:latest
+LABEL author="CRC Team"
+LABEL description="Apache node exporter"
+COPY prerequisite/apache/apache_exporter /bin/apache_exporter
+CMD /bin/apache_exporter -scrape_uri 'http://vm-apache:80/server-status/?auto'
