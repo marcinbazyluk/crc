@@ -3,12 +3,12 @@
   remote_user: studentvm
   gather_facts: no
   vars:
-    grafana_user: admin
-    grafana_pass: admin
-    github_user: jankujawa
-    github_token: 8f959a15d4e19e57a2b4356d489390f140e79b7c
+    grafana_user: *
+    grafana_pass: *
+    github_user: *
+    github_token: *
     github_uri: /CRC/docker-monitoring.git
-    github_server: github.ibm.com
+    github_server: *
     github_dest_clone: /home/studentvm/lab
     grafana_container: vm-grafana
     grafana_shell_user: grafana
